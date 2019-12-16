@@ -1,1 +1,1 @@
-# Federated-Learning-through-Bottleneck
+# Restricted-Federated-Learning
