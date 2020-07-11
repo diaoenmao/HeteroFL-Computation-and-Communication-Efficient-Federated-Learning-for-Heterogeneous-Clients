@@ -1,0 +1,51 @@
+---
+# control
+control:
+  optimizer_name: 'SGD'
+  split: 'iid'
+  num_users: '100'
+  frac: '0.1'
+# data
+data_name: CIFAR10
+subset: label
+batch_size:
+  train: 128
+  test: 128
+shuffle:
+  train: True
+  test: False
+num_workers: 0
+model_name: mcvae
+metric_name:
+  train:
+    - Loss
+    - Accuracy
+  test:
+    - Loss
+    - Accuracy
+# optimizer
+optimizer_name: SGD
+lr: 1.0e-2
+momentum: 0.5
+weight_decay: 1e-5
+# scheduler
+scheduler_name: None
+step_size: 1
+milestones:
+  - 100
+  - 150
+patience: 10
+threshold: 1.0e-3
+factor: 0.5
+min_lr: 1.0e-5
+# experiment
+init_seed: 0
+num_experiments: 1
+num_epochs:
+  local: 10
+  global: 200
+log_interval: 0.25
+device: cuda
+world_size: 1
+resume_mode: 0
+# other
