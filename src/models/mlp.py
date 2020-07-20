@@ -31,9 +31,9 @@ class MLP(nn.Module):
         return output
 
 
-def mlp():
+def mlp(mode='global'):
     data_shape = cfg['data_shape']
-    hidden_size = cfg['mlp']['hidden_size']
+    hidden_size = cfg['mlp'][mode]['hidden_size']
     classes_size = cfg['classes_size']
     cfg['model'] = {}
     model = MLP(data_shape, hidden_size, classes_size)

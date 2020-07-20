@@ -11,6 +11,8 @@ parser.add_argument('--world_size', default=1, type=int)
 parser.add_argument('--round', default=4, type=int)
 parser.add_argument('--experiment_step', default=1, type=int)
 parser.add_argument('--num_experiments', default=1, type=int)
+parser.add_argument('--num_epochs', default=200, type=int)
+parser.add_argument('--resume_mode', default=0, type=int)
 args = vars(parser.parse_args())
 
 
@@ -36,7 +38,7 @@ def main():
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
     if fed:
-        control_name = [['SGD'], ['iid'], ['100'], ['0.1']]
+        control_name = [['SGD'], ['iid'], ['100'], ['0.1'], ['0.5']]
     else:
         control_name = [['SGD'], ['none']]
     print(control_name)
@@ -49,7 +51,7 @@ def main():
     for i in range(len(controls)):
         controls[i] = list(controls[i])
         s = s + 'CUDA_VISIBLE_DEVICES=\"{}\" python {} --data_name {} --model_name {} --init_seed {} ' \
-                '--world_size {} --num_experiments {} --control_name {}&\n'.format(
+                '--world_size {} --num_experiments {} --resume_mode {} --control_name {}&\n'.format(
             gpu_ids[k % len(gpu_ids)], *controls[i])
         if k % round == round - 1:
             s = s[:-2] + '\n'

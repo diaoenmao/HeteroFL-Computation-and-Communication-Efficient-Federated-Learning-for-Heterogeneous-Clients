@@ -34,9 +34,9 @@ class Conv(nn.Module):
         return output
 
 
-def conv():
+def conv(mode='global'):
     data_shape = cfg['data_shape']
-    hidden_size = cfg['conv']['hidden_size']
+    hidden_size = cfg['conv'][mode]['hidden_size']
     classes_size = cfg['classes_size']
     cfg['model'] = {}
     model = Conv(data_shape, hidden_size, classes_size)

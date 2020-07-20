@@ -1,17 +1,22 @@
 import argparse
+import copy
 import datetime
 import models
+import numpy as np
 import os
 import shutil
 import time
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
+from collections import OrderedDict
+from torch.utils.data import DataLoader
 from config import cfg
-from data import fetch_dataset, make_data_loader
+from data import fetch_dataset, make_data_loader, split_dataset, SplitDataset
 from metrics import Metric
-from utils import save, to_device, process_control, process_dataset, resume, collate
+from utils import save, load, to_device, process_control, process_dataset, collate
 from logger import Logger
+from models.utils import random_average
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 cudnn.benchmark = True
@@ -30,7 +35,12 @@ cfg['pivot_metric'] = 'Loss'
 cfg['pivot'] = float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
 cfg['batch_size'] = {'train': 16, 'test': 512}
-cfg['lr'] = 1e-2
+if cfg['optimizer_name'] == 'SGD':
+    cfg['lr'] = 1e-2
+elif cfg['optimizer_name'] == 'Adam':
+    cfg['lr'] = 3e-4
+else:
+    raise ValueError('Not valid optimizer')
 
 
 def main():
@@ -50,15 +60,15 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
+    data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
-    optimizer = make_optimizer(model)
-    scheduler = make_scheduler(optimizer)
+    model = eval('models.{}("global").to(cfg["device"])'.format(cfg['model_name']))
+    federation = Federation(cfg['rate'])
     if cfg['resume_mode'] == 1:
-        last_epoch, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer, scheduler)
+        last_epoch, model, logger = resume(model, cfg['model_tag'])
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
-        _, model, _, _, _ = resume(model, cfg['model_tag'])
+        _, model, _ = resume(model, cfg['model_tag'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
@@ -67,22 +77,14 @@ def runExperiment():
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
-    if cfg['world_size'] > 1:
-        model = torch.nn.DataParallel(model, device_ids=list(range(cfg['world_size'])))
-    for epoch in range(last_epoch, cfg['num_epochs'] + 1):
+    for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
-        train(data_loader['train'], model, optimizer, logger, epoch)
-        test(data_loader['train'], model, logger, epoch)
-        if cfg['scheduler_name'] == 'ReduceLROnPlateau':
-            scheduler.step(metrics=logger.tracker['test/{}'.format(cfg['pivot_metric'])])
-        else:
-            scheduler.step()
+        train(dataset['train'], data_split, federation, model, logger, epoch)
+        test(data_loader['test'], model, logger, epoch)
         logger.safe(False)
-        model_state_dict = model.module.state_dict() if cfg['world_size'] > 1 else model.state_dict()
+        model_state_dict = model.state_dict()
         save_result = {
-            'config': cfg, 'epoch': epoch + 1, 'model_dict': model_state_dict,
-            'optimizer_dict': optimizer.state_dict(), 'scheduler_dict': scheduler.state_dict(),
-            'logger': logger}
+            'config': cfg, 'epoch': epoch + 1, 'model_dict': model_state_dict, 'logger': logger}
         save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
         if cfg['pivot'] > logger.tracker['test/{}'.format(cfg['pivot_metric'])]:
             cfg['pivot'] = logger.tracker['test/{}'.format(cfg['pivot_metric'])]
@@ -93,34 +95,21 @@ def runExperiment():
     return
 
 
-def train(data_loader, model, optimizer, logger, epoch):
-    metric = Metric()
-    model.train(True)
-    for i, input in enumerate(data_loader):
-        start_time = time.time()
-        input = collate(input)
-        input_size = input['img'].size(0)
-        input = to_device(input, cfg['device'])
-        optimizer.zero_grad()
-        output = model(input)
-        output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-        output['loss'].backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-        optimizer.step()
-        if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
-            batch_time = time.time() - start_time
-            lr = optimizer.param_groups[0]['lr']
-            epoch_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
-            exp_finished_time = epoch_finished_time + datetime.timedelta(
-                seconds=round((cfg['num_epochs'] - epoch) * batch_time * len(data_loader)))
-            info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                             'Train Epoch: {}({:.0f}%)'.format(epoch, 100. * i / len(data_loader)),
-                             'Learning rate: {}'.format(lr), 'Epoch Finished Time: {}'.format(epoch_finished_time),
-                             'Experiment Finished Time: {}'.format(exp_finished_time)]}
-            logger.append(info, 'train', mean=False)
-            evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
-            logger.append(evaluation, 'train', n=input_size)
-            logger.write('train', cfg['metric_name']['train'])
+def train(dataset, data_split, federation, global_model, logger, epoch):
+    global_model.train(True)
+    num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
+    print(num_active_users)
+    idx_user = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
+    global_parameters = global_model.state_dict()
+    local_parameters = federation.distribute(global_parameters, num_active_users)
+    for m in range(num_active_users):
+        local = Local(dataset, data_split[idx_user[m]])
+        local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
+        local_model.load_state_dict(local_parameters[m])
+        local.train(local_model, logger, epoch, idx_user[m])
+        local_parameters.append(copy.deepcopy(local_model.state_dict()))
+    global_parameters = federation.combine(local_parameters)
+    global_model.load_state_dict(global_parameters)
     return
 
 
@@ -171,7 +160,7 @@ def make_scheduler(optimizer):
     elif cfg['scheduler_name'] == 'ExponentialLR':
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     elif cfg['scheduler_name'] == 'CosineAnnealingLR':
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs'])
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['local'])
     elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
                                                          patience=cfg['patience'], verbose=True,
@@ -182,6 +171,116 @@ def make_scheduler(optimizer):
     else:
         raise ValueError('Not valid scheduler name')
     return scheduler
+
+
+def resume(model, model_tag, load_tag='checkpoint', verbose=True):
+    if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
+        checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
+        last_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['model_dict'])
+        logger = checkpoint['logger']
+        if verbose:
+            print('Resume from {}'.format(last_epoch))
+    else:
+        print('Not exists model tag: {}, start from scratch'.format(model_tag))
+        from datetime import datetime
+        from logger import Logger
+        last_epoch = 1
+        logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
+        logger = Logger(logger_path)
+    return last_epoch, model, logger
+
+
+class Local:
+    def __init__(self, dataset, idx):
+        self.data_loader = make_data_loader({'train': SplitDataset(dataset, idx)})['train']
+
+    def train(self, model, logger, epoch, id):
+        metric = Metric()
+        start_time = time.time()
+        model.train()
+        optimizer = make_optimizer(model)
+        for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
+            for i, input in enumerate(self.data_loader):
+                input = collate(input)
+                input_size = input['img'].size(0)
+                input = to_device(input, cfg['device'])
+                optimizer.zero_grad()
+                output = model(input)
+                output['loss'].backward()
+                optimizer.step()
+                if i % int((len(self.data_loader) * cfg['log_interval']) + 1) == 0:
+                    batch_time = time.time() - start_time
+                    lr = optimizer.param_groups[0]['lr']
+                    local_epoch_finished_time = datetime.timedelta(
+                        seconds=round(batch_time * (len(self.data_loader) - i - 1)))
+                    local_finished_time = local_epoch_finished_time + datetime.timedelta(
+                        seconds=round((cfg['num_epochs']['local'] - local_epoch) * batch_time * len(self.data_loader)))
+                    info = {'info': ['Model: {}'.format(cfg['model_tag']),
+                                     'ID: {}, Local/Global Epoch: {}/{}({:.0f}%)'.format(
+                                         id, local_epoch, epoch, 100. * i / len(self.data_loader)),
+                                     'Learning rate: {}'.format(lr), 'Local Epoch Finished Time: {}'.format(
+                            local_epoch_finished_time), 'Local Finished Time: {}'.format(local_finished_time)]}
+                    logger.append(info, 'train', mean=False)
+                    evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
+                    logger.append(evaluation, 'train', n=input_size)
+                    logger.write('train', cfg['metric_name']['train'])
+        return
+
+
+class Federation:
+    def __init__(self, rate):
+        self.rate = rate
+
+    def distribute(self, global_parameters, num_active_users):
+        idx_i = [None for _ in range(num_active_users)]
+        idx = [OrderedDict() for _ in range(num_active_users)]
+        local_parameters = [OrderedDict() for _ in range(num_active_users)]
+        output_weight = [k for k in global_parameters.keys() if 'weight' in k][-1]
+        for k, v in global_parameters.items():
+            parameter_type = k.split('.')[-1]
+            for m in range(num_active_users):
+                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if parameter_type == 'weight':
+                        if v.dim() > 1:
+                            input_size = v.size(1)
+                            output_size = v.size(0)
+                            if idx_i[m] is None:
+                                idx_i[m] = torch.arange(input_size, device=v.device)
+                            input_idx_i_m = idx_i[m]
+                            if k == output_weight:
+                                output_idx_i_m = torch.arange(output_size, device=v.device)
+                            else:
+                                local_output_size = int(np.ceil(output_size * self.rate))
+                                output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
+                            idx[m][k] = (output_idx_i_m, input_idx_i_m)
+                            local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(idx[m][k])])
+                            idx_i[m] = output_idx_i_m
+                        else:
+                            input_idx_i_m = idx_i[m]
+                            idx[m][k] = input_idx_i_m
+                            local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                    else:
+                        input_idx_i_m = idx_i[m]
+                        idx[m][k] = input_idx_i_m
+                        local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                else:
+                    local_parameters[m][k] = copy.deepcopy(v)
+        self.idx = idx
+        return local_parameters
+
+    def combine(self, local_parameters):
+        global_parameters = OrderedDict()
+        keys = local_parameters[0].keys()
+        for k in keys:
+            parameter_type = k.split('.')[-1]
+            for m in range(len(local_parameters)):
+            if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+            else:
+                local_parameters[m][k] = copy.deepcopy(v)
+
+
+        return
 
 
 if __name__ == "__main__":

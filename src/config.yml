@@ -5,6 +5,7 @@ control:
   split: 'iid'
   num_users: '100'
   frac: '0.1'
+  rate: '0.5'
 # data
 data_name: CIFAR10
 subset: label
@@ -15,7 +16,7 @@ shuffle:
   train: True
   test: False
 num_workers: 0
-model_name: mcvae
+model_name: conv
 metric_name:
   train:
     - Loss
@@ -27,7 +28,7 @@ metric_name:
 optimizer_name: SGD
 lr: 1.0e-2
 momentum: 0.5
-weight_decay: 1e-5
+weight_decay: 1.0e-5
 # scheduler
 scheduler_name: None
 step_size: 1

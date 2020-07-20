@@ -1,8 +1,9 @@
 import torch
 import datasets
+import numpy as np
 from config import cfg
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
 
@@ -34,8 +35,11 @@ def fetch_dataset(data_name, subset):
         dataset['test'] = eval('datasets.{}(root=root, split=\'test\', subset=subset,'
                                'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
         cfg['transform'] = {
-            'train': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-            'test': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            'train': datasets.Compose(
+                [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+            'test': datasets.Compose(
+                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         }
     elif data_name in ['ImageNet']:
         dataset['train'] = eval('datasets.{}(root=root, split=\'train\', subset=subset, size=128,'
@@ -74,6 +78,35 @@ def input_collate(batch):
         return default_collate(batch)
 
 
+def split_dataset(dataset, num_users, split):
+    if split == 'iid':
+        num_items = round(len(dataset) / num_users)
+        data_split, idx = {}, [i for i in range(len(dataset))]
+        for i in range(num_users):
+            num_items_i = min(len(idx), num_items)
+            data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
+            idx = list(set(idx) - set(data_split[i]))
+    elif split == 'non-iid':
+        num_items = round(len(dataset) / num_users)
+        idx_shard = np.arange(0, len(dataset), num_items)
+        data_split, idx = {}, [i for i in range(len(dataset))]
+        label = dataset.target['label']
+        sorted_indices = np.argsort(label)
+        idx = idx[sorted_indices]
+        for i in range(num_users):
+            pivot = np.random.choice(idx_shard, 2, replace=False)
+            idx_shard = list(set(idx_shard) - set(pivot))
+            data_split[i] = idx[pivot[0] * num_items:(pivot[0] + 1) * num_items] + \
+                            idx[pivot[1] * num_items:(pivot[1] + 1) * num_items]
+    elif split == 'none':
+        data_split = {}
+        for i in range(num_users):
+            data_split[i] = [i for i in range(len(dataset))]
+    else:
+        raise ValueError('Not valid data split mode')
+    return data_split
+
+
 def make_data_loader(dataset):
     data_loader = {}
     for k in dataset:
@@ -81,3 +114,17 @@ def make_data_loader(dataset):
                                                      batch_size=cfg['batch_size'][k], pin_memory=True,
                                                      num_workers=cfg['num_workers'], collate_fn=input_collate)
     return data_loader
+
+
+class SplitDataset(Dataset):
+    def __init__(self, dataset, idx):
+        super().__init__()
+        self.dataset = dataset
+        self.idx = idx
+
+    def __len__(self):
+        return len(self.idx)
+
+    def __getitem__(self, item):
+        input = self.dataset[self.idx[item]]
+        return input

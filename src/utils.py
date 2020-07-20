@@ -107,21 +107,24 @@ def process_control():
     if cfg['split'] != 'none':
         cfg['num_users'] = int(cfg['control']['num_users'])
         cfg['frac'] = float(cfg['control']['frac'])
-    cfg[cfg['model_name']] = {}
-    if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'EMNIST', 'Omniglot']:
+        cfg['rate'] = float(cfg['control']['rate'])
+    cfg[cfg['model_name']] = {'global':{}, 'local':{}}
+    if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
         cfg['data_shape'] = [1, 28, 28]
+        cfg['num_epochs'] = {'global': 50, 'local': 10}
         if cfg['model_name'] == 'mlp':
-            cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
         elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['hidden_size'] = [32, 64, 128, 256]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [32, 64, 128, 256]
         else:
             raise ValueError('Not valid model name')
     elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
+        cfg['num_epochs'] = {'global': 200, 'local': 1}
         if cfg['model_name'] == 'mlp':
-            cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
         elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['hidden_size'] = [32, 64, 128, 256]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [32, 64, 128, 256]
         else:
             raise ValueError('Not valid model name')
     elif cfg['data_name'] in ['ImageNet']:
@@ -134,7 +137,9 @@ def process_control():
             raise ValueError('Not valid model name')
     else:
         raise ValueError('Not valid dataset')
-
+    if cfg['split'] != 'none':
+        cfg[cfg['model_name']]['local']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
+                                                          cfg[cfg['model_name']]['global']['hidden_size']]
     return
 
 
