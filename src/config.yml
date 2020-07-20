@@ -1,7 +1,7 @@
 ---
 # control
 control:
-  optimizer_name: 'SGD'
+  optimizer_name: 'Adam'
   split: 'iid'
   num_users: '100'
   frac: '0.1'
@@ -45,7 +45,7 @@ num_experiments: 1
 num_epochs:
   local: 10
   global: 200
-log_interval: 0.25
+log_interval: 1
 device: cuda
 world_size: 1
 resume_mode: 0

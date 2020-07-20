@@ -103,6 +103,12 @@ def process_dataset(dataset):
 
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
+    if cfg['optimizer_name'] == 'SGD':
+        cfg['lr'] = 1e-2
+    elif cfg['optimizer_name'] == 'Adam':
+        cfg['lr'] = 3e-4
+    else:
+        raise ValueError('Not valid optimizer')
     cfg['split'] = cfg['control']['split']
     if cfg['split'] != 'none':
         cfg['num_users'] = int(cfg['control']['num_users'])
@@ -120,7 +126,7 @@ def process_control():
             raise ValueError('Not valid model name')
     elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
-        cfg['num_epochs'] = {'global': 200, 'local': 1}
+        cfg['num_epochs'] = {'global': 200, 'local': 10}
         if cfg['model_name'] == 'mlp':
             cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
         elif cfg['model_name'] == 'conv':

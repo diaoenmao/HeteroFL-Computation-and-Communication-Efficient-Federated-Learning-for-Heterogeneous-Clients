@@ -1,6 +1,7 @@
 import argparse
 import copy
 import datetime
+import math
 import models
 import numpy as np
 import os
@@ -16,7 +17,6 @@ from data import fetch_dataset, make_data_loader, split_dataset, SplitDataset
 from metrics import Metric
 from utils import save, load, to_device, process_control, process_dataset, collate
 from logger import Logger
-from models.utils import random_average
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 cudnn.benchmark = True
@@ -35,12 +35,6 @@ cfg['pivot_metric'] = 'Loss'
 cfg['pivot'] = float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
 cfg['batch_size'] = {'train': 16, 'test': 512}
-if cfg['optimizer_name'] == 'SGD':
-    cfg['lr'] = 1e-2
-elif cfg['optimizer_name'] == 'Adam':
-    cfg['lr'] = 3e-4
-else:
-    raise ValueError('Not valid optimizer')
 
 
 def main():
@@ -63,17 +57,19 @@ def runExperiment():
     data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
     data_loader = make_data_loader(dataset)
     model = eval('models.{}("global").to(cfg["device"])'.format(cfg['model_name']))
-    federation = Federation(cfg['rate'])
+    global_parameters = model.state_dict()
     if cfg['resume_mode'] == 1:
-        last_epoch, model, logger = resume(model, cfg['model_tag'])
+        last_epoch, federation, model, logger = resume(model, cfg['model_tag'])
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
-        _, model, _ = resume(model, cfg['model_tag'])
+        _, model, _, _ = resume(model, cfg['model_tag'])
+        federation = Federation(global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     else:
         last_epoch = 1
+        federation = Federation(global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
@@ -84,7 +80,8 @@ def runExperiment():
         logger.safe(False)
         model_state_dict = model.state_dict()
         save_result = {
-            'config': cfg, 'epoch': epoch + 1, 'model_dict': model_state_dict, 'logger': logger}
+            'config': cfg, 'epoch': epoch + 1, 'federation': federation, 'model_dict': model_state_dict,
+            'logger': logger}
         save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
         if cfg['pivot'] > logger.tracker['test/{}'.format(cfg['pivot_metric'])]:
             cfg['pivot'] = logger.tracker['test/{}'.format(cfg['pivot_metric'])]
@@ -96,20 +93,18 @@ def runExperiment():
 
 
 def train(dataset, data_split, federation, global_model, logger, epoch):
+    global_model.load_state_dict(federation.global_parameters)
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
-    print(num_active_users)
     idx_user = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    global_parameters = global_model.state_dict()
-    local_parameters = federation.distribute(global_parameters, num_active_users)
+    local_parameters = federation.distribute(num_active_users)
     for m in range(num_active_users):
         local = Local(dataset, data_split[idx_user[m]])
         local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
         local_model.load_state_dict(local_parameters[m])
         local.train(local_model, logger, epoch, idx_user[m])
-        local_parameters.append(copy.deepcopy(local_model.state_dict()))
-    global_parameters = federation.combine(local_parameters)
-    global_model.load_state_dict(global_parameters)
+        local_parameters[m] = copy.deepcopy(local_model.state_dict())
+    federation.combine(local_parameters)
     return
 
 
@@ -177,6 +172,7 @@ def resume(model, model_tag, load_tag='checkpoint', verbose=True):
     if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
         checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
         last_epoch = checkpoint['epoch']
+        federation = checkpoint['federation']
         model.load_state_dict(checkpoint['model_dict'])
         logger = checkpoint['logger']
         if verbose:
@@ -186,9 +182,10 @@ def resume(model, model_tag, load_tag='checkpoint', verbose=True):
         from datetime import datetime
         from logger import Logger
         last_epoch = 1
+        federation = Federation(model.state_dict(), cfg['rate'])
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
         logger = Logger(logger_path)
-    return last_epoch, model, logger
+    return last_epoch, federation, model, logger
 
 
 class Local:
@@ -209,7 +206,7 @@ class Local:
                 output = model(input)
                 output['loss'].backward()
                 optimizer.step()
-                if i % int((len(self.data_loader) * cfg['log_interval']) + 1) == 0:
+                if (i + 1) % math.ceil((len(self.data_loader) * cfg['log_interval'])) == 0:
                     batch_time = time.time() - start_time
                     lr = optimizer.param_groups[0]['lr']
                     local_epoch_finished_time = datetime.timedelta(
@@ -218,7 +215,7 @@ class Local:
                         seconds=round((cfg['num_epochs']['local'] - local_epoch) * batch_time * len(self.data_loader)))
                     info = {'info': ['Model: {}'.format(cfg['model_tag']),
                                      'ID: {}, Local/Global Epoch: {}/{}({:.0f}%)'.format(
-                                         id, local_epoch, epoch, 100. * i / len(self.data_loader)),
+                                         id, local_epoch, epoch, 100. * (i + 1) / len(self.data_loader)),
                                      'Learning rate: {}'.format(lr), 'Local Epoch Finished Time: {}'.format(
                             local_epoch_finished_time), 'Local Finished Time: {}'.format(local_finished_time)]}
                     logger.append(info, 'train', mean=False)
@@ -229,15 +226,16 @@ class Local:
 
 
 class Federation:
-    def __init__(self, rate):
+    def __init__(self, global_parameters, rate):
+        self.global_parameters = global_parameters
         self.rate = rate
 
-    def distribute(self, global_parameters, num_active_users):
+    def distribute(self, num_active_users):
         idx_i = [None for _ in range(num_active_users)]
         idx = [OrderedDict() for _ in range(num_active_users)]
         local_parameters = [OrderedDict() for _ in range(num_active_users)]
-        output_weight = [k for k in global_parameters.keys() if 'weight' in k][-1]
-        for k, v in global_parameters.items():
+        output_weight = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
+        for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
             for m in range(num_active_users):
                 if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
@@ -253,8 +251,8 @@ class Federation:
                             else:
                                 local_output_size = int(np.ceil(output_size * self.rate))
                                 output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
-                            idx[m][k] = (output_idx_i_m, input_idx_i_m)
-                            local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(idx[m][k])])
+                            idx[m][k] = torch.meshgrid(output_idx_i_m, input_idx_i_m)
+                            local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
                             idx_i[m] = output_idx_i_m
                         else:
                             input_idx_i_m = idx_i[m]
@@ -264,22 +262,26 @@ class Federation:
                         input_idx_i_m = idx_i[m]
                         idx[m][k] = input_idx_i_m
                         local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+
                 else:
                     local_parameters[m][k] = copy.deepcopy(v)
         self.idx = idx
         return local_parameters
 
     def combine(self, local_parameters):
-        global_parameters = OrderedDict()
-        keys = local_parameters[0].keys()
-        for k in keys:
+        idx = self.idx
+        for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
+            tmp_v, count = v.new_zeros(v.size(), dtype=torch.float32), v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(len(local_parameters)):
-            if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
-            else:
-                local_parameters[m][k] = copy.deepcopy(v)
-
-
+                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    tmp_v[idx[m][k]] += local_parameters[m][k]
+                    count[idx[m][k]] += 1
+                else:
+                    tmp_v += local_parameters[m][k]
+                    count += 1
+            tmp_v[count > 0] = tmp_v[count > 0].div_(count[count > 0])
+            v[count > 0] = tmp_v[count > 0].to(v.dtype)
         return
 
 
