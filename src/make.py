@@ -38,9 +38,9 @@ def main():
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
     if fed:
-        control_name = [['SGD'], ['iid'], ['100'], ['0.1'], ['0.5']]
+        control_name = [['SGD', 'Adam'], ['iid', 'none-iid'], ['100'], ['0.1'], ['0.125', '0.5']]
     else:
-        control_name = [['SGD'], ['none']]
+        control_name = [['SGD', 'Adam'], ['none']]
     print(control_name)
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + \

@@ -33,7 +33,6 @@ cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['pivot_metric'] = 'Loss'
 cfg['pivot'] = float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
-cfg['batch_size'] = {'train': 16, 'test': 512}
 
 
 def main():
@@ -205,7 +204,7 @@ class Local:
                 output = model(input)
                 output['loss'].backward()
                 optimizer.step()
-                if (i + 1) % math.ceil((len(self.data_loader) * cfg['log_interval'])) == 0:
+                if i % int((len(self.data_loader) * cfg['log_interval']) + 1) == 0:
                     batch_time = time.time() - start_time
                     lr = optimizer.param_groups[0]['lr']
                     local_epoch_finished_time = datetime.timedelta(
@@ -285,15 +284,6 @@ class Federation:
             tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
             v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
         return
-    #
-    # def produce(self):
-    #     count = self.count
-    #     model_parameters = copy.deepcopy(self.global_parameters)
-    #     for k, v in model_parameters.items():
-    #         parameter_type = k.split('.')[-1]
-    #         if parameter_type in ['weight', 'bias']:
-    #             v[count[k] > 0] *= self.rate
-    #     return model_parameters
 
 
 if __name__ == "__main__":

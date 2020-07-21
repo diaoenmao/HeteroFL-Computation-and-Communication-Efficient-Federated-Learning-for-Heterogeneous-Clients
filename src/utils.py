@@ -120,19 +120,21 @@ def process_control():
     if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
         cfg['data_shape'] = [1, 28, 28]
         cfg['num_epochs'] = {'global': 50, 'local': 10}
+        cfg['batch_size'] = {'train': 16, 'test': 512}
         if cfg['model_name'] == 'mlp':
             cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
         elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [32, 64, 128, 256]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
         else:
             raise ValueError('Not valid model name')
     elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
         cfg['num_epochs'] = {'global': 200, 'local': 10}
+        cfg['batch_size'] = {'train': 16, 'test': 512}
         if cfg['model_name'] == 'mlp':
             cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
         elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [32, 64, 128, 256]
+            cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
         else:
             raise ValueError('Not valid model name')
     elif cfg['data_name'] in ['ImageNet']:
