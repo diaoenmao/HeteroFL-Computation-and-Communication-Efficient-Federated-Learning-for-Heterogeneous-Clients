@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from config import cfg
 from .utils import init_param
+from modules import Scaler
 
 Normalization = nn.BatchNorm1d
 Activation = nn.ReLU
@@ -14,12 +15,14 @@ class MLP(nn.Module):
         super().__init__()
         blocks = [nn.Flatten(),
                   nn.Linear(np.prod(data_shape), hidden_size[0]),
-                  Normalization(hidden_size[0]),
-                  Activation(inplace=True)]
+                  Normalization(hidden_size[0], track_running_stats=False),
+                  Activation(inplace=True),
+                  Scaler(cfg['rate'])]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Linear(hidden_size[i], hidden_size[i + 1]),
-                           Normalization(hidden_size[i + 1]),
-                           Activation(inplace=True)])
+                           Normalization(hidden_size[i + 1], track_running_stats=False),
+                           Activation(inplace=True),
+                           Scaler(cfg['rate'])])
         blocks.extend([nn.Linear(hidden_size[-1], classes_size)])
         self.blocks = nn.Sequential(*blocks)
 

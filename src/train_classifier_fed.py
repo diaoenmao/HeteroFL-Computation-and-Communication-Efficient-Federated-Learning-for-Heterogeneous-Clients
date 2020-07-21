@@ -11,7 +11,6 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from collections import OrderedDict
-from torch.utils.data import DataLoader
 from config import cfg
 from data import fetch_dataset, make_data_loader, split_dataset, SplitDataset
 from metrics import Metric
@@ -155,7 +154,7 @@ def make_scheduler(optimizer):
     elif cfg['scheduler_name'] == 'ExponentialLR':
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     elif cfg['scheduler_name'] == 'CosineAnnealingLR':
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['local'])
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['global'])
     elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
                                                          patience=cfg['patience'], verbose=True,
@@ -233,12 +232,14 @@ class Federation:
     def distribute(self, num_active_users):
         idx_i = [None for _ in range(num_active_users)]
         idx = [OrderedDict() for _ in range(num_active_users)]
+        count = OrderedDict()
         local_parameters = [OrderedDict() for _ in range(num_active_users)]
         output_weight = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
+            count[k] = v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(num_active_users):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
                             input_size = v.size(1)
@@ -262,27 +263,37 @@ class Federation:
                         input_idx_i_m = idx_i[m]
                         idx[m][k] = input_idx_i_m
                         local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
-
+                    count[k][idx[m][k]] += 1
                 else:
                     local_parameters[m][k] = copy.deepcopy(v)
+                    count[k] += 1
         self.idx = idx
+        self.count = count
         return local_parameters
 
     def combine(self, local_parameters):
         idx = self.idx
+        count = self.count
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
-            tmp_v, count = v.new_zeros(v.size(), dtype=torch.float32), v.new_zeros(v.size(), dtype=torch.float32)
+            tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(len(local_parameters)):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                if parameter_type in ['weight', 'bias']:
                     tmp_v[idx[m][k]] += local_parameters[m][k]
-                    count[idx[m][k]] += 1
                 else:
                     tmp_v += local_parameters[m][k]
-                    count += 1
-            tmp_v[count > 0] = tmp_v[count > 0].div_(count[count > 0])
-            v[count > 0] = tmp_v[count > 0].to(v.dtype)
+            tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
+            v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
         return
+    #
+    # def produce(self):
+    #     count = self.count
+    #     model_parameters = copy.deepcopy(self.global_parameters)
+    #     for k, v in model_parameters.items():
+    #         parameter_type = k.split('.')[-1]
+    #         if parameter_type in ['weight', 'bias']:
+    #             v[count[k] > 0] *= self.rate
+    #     return model_parameters
 
 
 if __name__ == "__main__":

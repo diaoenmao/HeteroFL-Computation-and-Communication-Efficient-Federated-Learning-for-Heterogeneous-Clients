@@ -105,8 +105,10 @@ def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
     if cfg['optimizer_name'] == 'SGD':
         cfg['lr'] = 1e-2
+        cfg['weight_decay'] = 1e-4
     elif cfg['optimizer_name'] == 'Adam':
         cfg['lr'] = 3e-4
+        cfg['weight_decay'] = 1e-4
     else:
         raise ValueError('Not valid optimizer')
     cfg['split'] = cfg['control']['split']
