@@ -3,6 +3,7 @@ import errno
 import numpy as np
 import os
 import torch
+import torch.optim as optim
 from itertools import repeat
 from torchvision.utils import save_image
 from config import cfg
@@ -104,52 +105,88 @@ def process_dataset(dataset):
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
     if cfg['optimizer_name'] == 'SGD':
-        cfg['lr'] = 1e-2
+        cfg['lr'] = 1e-1
+        cfg['scheduler_name'] = 'CosineAnnealingLR'
         cfg['weight_decay'] = 1e-4
     elif cfg['optimizer_name'] == 'Adam':
-        cfg['lr'] = 3e-4
+        cfg['lr'] = 1e-3
+        cfg['scheduler_name'] = 'ReduceLROnPlateau'
         cfg['weight_decay'] = 1e-4
     else:
         raise ValueError('Not valid optimizer')
     cfg['split'] = cfg['control']['split']
+    cfg['num_users'] = int(cfg['control']['num_users'])
+    cfg['frac'] = float(cfg['control']['frac'])
+    cfg['rate'] = float(cfg['control']['rate'])
+    cfg[cfg['model_name']] = {'global': {}, 'local': {}}
     if cfg['split'] != 'none':
-        cfg['num_users'] = int(cfg['control']['num_users'])
-        cfg['frac'] = float(cfg['control']['frac'])
-        cfg['rate'] = float(cfg['control']['rate'])
-    cfg[cfg['model_name']] = {'global':{}, 'local':{}}
-    if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
-        cfg['data_shape'] = [1, 28, 28]
-        cfg['num_epochs'] = {'global': 50, 'local': 10}
-        cfg['batch_size'] = {'train': 16, 'test': 512}
-        if cfg['model_name'] == 'mlp':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
-        elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+        if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
+            cfg['data_shape'] = [1, 28, 28]
+            cfg['num_epochs'] = {'global': 200, 'local': 10}
+            cfg['batch_size'] = {'train': 16, 'test': 512}
+            if cfg['model_name'] == 'mlp':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+            elif cfg['model_name'] == 'conv':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+            else:
+                raise ValueError('Not valid model name')
+        elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
+            cfg['data_shape'] = [3, 32, 32]
+            cfg['num_epochs'] = {'global': 200, 'local': 10}
+            cfg['batch_size'] = {'train': 16, 'test': 512}
+            if cfg['model_name'] == 'mlp':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+            elif cfg['model_name'] == 'conv':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+            else:
+                raise ValueError('Not valid model name')
+        elif cfg['data_name'] in ['ImageNet']:
+            cfg['data_shape'] = [3, 224, 224]
+            if cfg['model_name'] == 'mlp':
+                raise NotImplementedError
+            elif cfg['model_name'] == 'conv':
+                raise NotImplementedError
+            else:
+                raise ValueError('Not valid model name')
         else:
-            raise ValueError('Not valid model name')
-    elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
-        cfg['data_shape'] = [3, 32, 32]
-        cfg['num_epochs'] = {'global': 200, 'local': 10}
-        cfg['batch_size'] = {'train': 16, 'test': 512}
-        if cfg['model_name'] == 'mlp':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
-        elif cfg['model_name'] == 'conv':
-            cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
-        else:
-            raise ValueError('Not valid model name')
-    elif cfg['data_name'] in ['ImageNet']:
-        cfg['data_shape'] = [3, 224, 224]
-        if cfg['model_name'] == 'mlp':
-            raise NotImplementedError
-        elif cfg['model_name'] == 'conv':
-            raise NotImplementedError
-        else:
-            raise ValueError('Not valid model name')
-    else:
-        raise ValueError('Not valid dataset')
-    if cfg['split'] != 'none':
+            raise ValueError('Not valid dataset')
         cfg[cfg['model_name']]['local']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
                                                           cfg[cfg['model_name']]['global']['hidden_size']]
+        cfg['log_interval'] = 1
+    else:
+        if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
+            cfg['data_shape'] = [1, 28, 28]
+            cfg['num_epochs'] = {'global': 200}
+            cfg['batch_size'] = {'train': 128, 'test': 512}
+            if cfg['model_name'] == 'mlp':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+            elif cfg['model_name'] == 'conv':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+            else:
+                raise ValueError('Not valid model name')
+        elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
+            cfg['data_shape'] = [3, 32, 32]
+            cfg['num_epochs'] = {'global': 200}
+            cfg['batch_size'] = {'train': 128, 'test': 512}
+            if cfg['model_name'] == 'mlp':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+            elif cfg['model_name'] == 'conv':
+                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+            else:
+                raise ValueError('Not valid model name')
+        elif cfg['data_name'] in ['ImageNet']:
+            cfg['data_shape'] = [3, 224, 224]
+            if cfg['model_name'] == 'mlp':
+                raise NotImplementedError
+            elif cfg['model_name'] == 'conv':
+                raise NotImplementedError
+            else:
+                raise ValueError('Not valid model name')
+        else:
+            raise ValueError('Not valid dataset')
+        cfg[cfg['model_name']]['global']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
+                                                           cfg[cfg['model_name']]['global']['hidden_size']]
+        cfg['log_interval'] = 0.25
     return
 
 
@@ -193,6 +230,46 @@ class Stats(object):
                     old_mean - new_mean) ** 2)
             self.n_samples += n
         return
+
+
+def make_optimizer(model, lr):
+    if cfg['optimizer_name'] == 'SGD':
+        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=cfg['momentum'],
+                              weight_decay=cfg['weight_decay'])
+    elif cfg['optimizer_name'] == 'RMSprop':
+        optimizer = optim.RMSprop(model.parameters(), lr=lr, momentum=cfg['momentum'],
+                                  weight_decay=cfg['weight_decay'])
+    elif cfg['optimizer_name'] == 'Adam':
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=cfg['weight_decay'])
+    elif cfg['optimizer_name'] == 'Adamax':
+        optimizer = optim.Adamax(model.parameters(), lr=lr, weight_decay=cfg['weight_decay'])
+    else:
+        raise ValueError('Not valid optimizer name')
+    return optimizer
+
+
+def make_scheduler(optimizer):
+    if cfg['scheduler_name'] == 'None':
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[65535])
+    elif cfg['scheduler_name'] == 'StepLR':
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=cfg['step_size'], gamma=cfg['factor'])
+    elif cfg['scheduler_name'] == 'MultiStepLR':
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg['milestones'], gamma=cfg['factor'])
+    elif cfg['scheduler_name'] == 'ExponentialLR':
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
+    elif cfg['scheduler_name'] == 'CosineAnnealingLR':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['global'],
+                                                         eta_min=cfg['min_lr'])
+    elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
+                                                         patience=cfg['patience'], verbose=True,
+                                                         threshold=cfg['threshold'], threshold_mode='rel',
+                                                         min_lr=cfg['min_lr'])
+    elif cfg['scheduler_name'] == 'CyclicLR':
+        scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=cfg['lr'], max_lr=10 * cfg['lr'])
+    else:
+        raise ValueError('Not valid scheduler name')
+    return scheduler
 
 
 def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoint', verbose=True):

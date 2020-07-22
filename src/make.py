@@ -11,7 +11,6 @@ parser.add_argument('--world_size', default=1, type=int)
 parser.add_argument('--round', default=4, type=int)
 parser.add_argument('--experiment_step', default=1, type=int)
 parser.add_argument('--num_experiments', default=1, type=int)
-parser.add_argument('--num_epochs', default=200, type=int)
 parser.add_argument('--resume_mode', default=0, type=int)
 args = vars(parser.parse_args())
 
@@ -26,9 +25,10 @@ def main():
     round = args['round']
     experiment_step = args['experiment_step']
     num_experiments = args['num_experiments']
+    resume_mode = args['resume_mode']
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpu, world_size))]
-    filename = '{}_{}'.format(run, file)
-    if fed:
+    filename = '{}_{}'.format(run, model)
+    if run == 'train' and fed:
         script_name = [['{}_{}_fed.py'.format(run, file)]]
     else:
         script_name = [['{}_{}.py'.format(run, file)]]
@@ -37,13 +37,13 @@ def main():
     init_seeds = [list(range(0, num_experiments, experiment_step))]
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
+    resume_mode = [[resume_mode]]
     if fed:
-        control_name = [['SGD', 'Adam'], ['iid', 'none-iid'], ['100'], ['0.1'], ['0.125', '0.5']]
+        control_name = [['SGD', 'Adam'], ['iid'], ['100'], ['0.1'], ['0.0625', '0.125', '0.25', '0.5']]
     else:
-        control_name = [['SGD', 'Adam'], ['none']]
-    print(control_name)
+        control_name = [['SGD', 'Adam'], ['none'], ['1'], ['1'], ['0.0625', '0.125', '0.25', '0.5']]
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
-    controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + \
+    controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names
     controls = list(itertools.product(*controls))
     s = '#!/bin/bash\n'

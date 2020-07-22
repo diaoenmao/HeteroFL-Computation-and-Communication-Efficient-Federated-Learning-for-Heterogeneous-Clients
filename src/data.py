@@ -88,16 +88,16 @@ def split_dataset(dataset, num_users, split):
             idx = list(set(idx) - set(data_split[i]))
     elif split == 'non-iid':
         num_items = round(len(dataset) / num_users)
-        idx_shard = np.arange(0, len(dataset), num_items)
-        data_split, idx = {}, [i for i in range(len(dataset))]
-        label = dataset.target['label']
-        sorted_indices = np.argsort(label)
+        idx_shard = [i for i in range(0, len(dataset), num_items // 2)]
+        data_split, idx = {}, np.arange(0, len(dataset))
+        label = dataset.target
+        sorted_indices = np.argsort(label).tolist()
         idx = idx[sorted_indices]
         for i in range(num_users):
             pivot = np.random.choice(idx_shard, 2, replace=False)
             idx_shard = list(set(idx_shard) - set(pivot))
-            data_split[i] = idx[pivot[0] * num_items:(pivot[0] + 1) * num_items] + \
-                            idx[pivot[1] * num_items:(pivot[1] + 1) * num_items]
+            data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
+                            idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
     elif split == 'none':
         data_split = {}
         for i in range(num_users):
@@ -125,6 +125,6 @@ class SplitDataset(Dataset):
     def __len__(self):
         return len(self.idx)
 
-    def __getitem__(self, item):
-        input = self.dataset[self.idx[item]]
+    def __getitem__(self, index):
+        input = self.dataset[self.idx[index]]
         return input
