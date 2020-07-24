@@ -39,9 +39,9 @@ def main():
     num_experiments = [[experiment_step]]
     resume_mode = [[resume_mode]]
     if fed:
-        control_name = [['SGD', 'Adam'], ['iid'], ['100'], ['0.1'], ['0.0625', '0.125', '0.25', '0.5']]
+        control_name = [['SGD', 'Adam'], ['iid'], ['100'], ['1'], ['0.0625', '0.125', '0.25', '0.5', '1']]
     else:
-        control_name = [['SGD', 'Adam'], ['none'], ['1'], ['1'], ['0.0625', '0.125', '0.25', '0.5']]
+        control_name = [['SGD', 'Adam'], ['none'], ['1'], ['1'], ['0.0625', '0.125', '0.25', '0.5', '1']]
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names

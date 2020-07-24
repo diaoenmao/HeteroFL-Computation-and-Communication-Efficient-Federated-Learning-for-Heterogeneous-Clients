@@ -47,7 +47,10 @@ def runExperiment():
     data_loader = make_data_loader(dataset)
     model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
     load_tag = 'best'
-    last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
+    if cfg['split'] != 'none':
+        last_epoch, _, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
+    else:
+        last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)

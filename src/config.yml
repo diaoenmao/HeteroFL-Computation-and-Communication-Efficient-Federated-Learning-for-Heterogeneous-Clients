@@ -38,7 +38,7 @@ milestones:
 patience: 10
 threshold: 1.0e-3
 factor: 0.5
-min_lr: 1.0e-5
+min_lr: 1.0e-4
 # experiment
 init_seed: 0
 num_experiments: 1

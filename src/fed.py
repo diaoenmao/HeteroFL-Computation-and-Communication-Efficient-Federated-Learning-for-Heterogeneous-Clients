@@ -5,8 +5,8 @@ from collections import OrderedDict
 
 
 class Federation:
-    def __init__(self, data_split, global_parameters, rate):
-        self.data_split = data_split
+    def __init__(self, num_users, global_parameters, rate):
+        self.num_users = num_users
         self.global_parameters = global_parameters
         self.rate = rate
 

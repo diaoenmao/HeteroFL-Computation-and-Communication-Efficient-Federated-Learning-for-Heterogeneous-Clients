@@ -50,29 +50,30 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
-    data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
     data_loader = make_data_loader(dataset)
     model = eval('models.{}("global").to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
     if cfg['resume_mode'] == 1:
-        last_epoch, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer, scheduler)
+        last_epoch, data_split, federation, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
+                                                                                         optimizer, scheduler)
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
-        _, model, _, _, _ = resume(model, cfg['model_tag'])
+        _, data_split, federation, model, _, _, _ = resume(model, cfg['model_tag'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     else:
         last_epoch = 1
+        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
+        federation = Federation(cfg['num_users'], global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
-    federation = Federation(data_split, global_parameters, cfg['rate'])
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
-        train(dataset['train'], federation, model, optimizer, logger, epoch)
+        train(dataset['train'], data_split, federation, model, optimizer, logger, epoch)
         test(data_loader['test'], model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.tracker['test/{}'.format(cfg['pivot_metric'])])
@@ -81,9 +82,9 @@ def runExperiment():
         logger.safe(False)
         model_state_dict = model.state_dict()
         save_result = {
-            'config': cfg, 'epoch': epoch + 1, 'model_dict': model_state_dict,
-            'optimizer_dict': optimizer.state_dict(), 'scheduler_dict': scheduler.state_dict(),
-            'logger': logger}
+            'config': cfg, 'epoch': epoch + 1, 'data_split': data_split, 'federation': federation,
+            'model_dict': model_state_dict, 'optimizer_dict': optimizer.state_dict(),
+            'scheduler_dict': scheduler.state_dict(), 'logger': logger}
         save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
         if cfg['pivot'] > logger.tracker['test/{}'.format(cfg['pivot_metric'])]:
             cfg['pivot'] = logger.tracker['test/{}'.format(cfg['pivot_metric'])]
@@ -94,19 +95,62 @@ def runExperiment():
     return
 
 
-def train(dataset, federation, global_model, optimizer, logger, epoch):
+# def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
+#     global_model.train(True)
+#     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
+#     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
+#     local_parameters = [None for _ in range(num_active_users)]
+#     for m in range(num_active_users):
+#         start_time = time.time()
+#         local = Local(dataset, data_split[user_idx[m]])
+#         local_parameters[m] = federation.distribute(user_idx[m])
+#         local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
+#         local_model.load_state_dict(local_parameters[m])
+#         local.train(local_model, optimizer.param_groups[0]['lr'], logger)
+#         local_parameters[m] = copy.deepcopy(local_model.state_dict())
+#         local_time = time.time() - start_time
+#         lr = optimizer.param_groups[0]['lr']
+#         epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
+#         exp_finished_time = epoch_finished_time + datetime.timedelta(
+#             seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
+#         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
+#                          'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
+#                          'Learning rate: {}'.format(lr),
+#                          'Epoch Finished Time: {}'.format(epoch_finished_time),
+#                          'Experiment Finished Time: {}'.format(exp_finished_time)]}
+#         logger.append(info, 'train', mean=False)
+#         logger.write('train', cfg['metric_name']['train'])
+#     federation.combine(local_parameters, user_idx)
+#     global_model.load_state_dict(federation.global_parameters)
+#     return
+
+def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
     global_model.load_state_dict(federation.global_parameters)
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
-    idx_user = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
+    user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
     local_parameters = federation.distribute(num_active_users)
     for m in range(num_active_users):
-        local = Local(dataset, federation.data_split[idx_user[m]])
+        start_time = time.time()
+        local = Local(dataset, data_split[user_idx[m]])
         local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
         local_model.load_state_dict(local_parameters[m])
-        local.train(local_model, optimizer.param_groups[0]['lr'], logger, epoch, idx_user[m])
+        local.train(local_model, optimizer.param_groups[0]['lr'], logger)
         local_parameters[m] = copy.deepcopy(local_model.state_dict())
+        local_time = time.time() - start_time
+        lr = optimizer.param_groups[0]['lr']
+        epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
+        exp_finished_time = epoch_finished_time + datetime.timedelta(
+            seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
+        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
+                         'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
+                         'Learning rate: {}'.format(lr),
+                         'Epoch Finished Time: {}'.format(epoch_finished_time),
+                         'Experiment Finished Time: {}'.format(exp_finished_time)]}
+        logger.append(info, 'train', mean=False)
+        logger.write('train', cfg['metric_name']['train'])
     federation.combine(local_parameters)
+    global_model.load_state_dict(federation.global_parameters)
     return
 
 
@@ -133,9 +177,8 @@ class Local:
     def __init__(self, dataset, idx):
         self.data_loader = make_data_loader({'train': SplitDataset(dataset, idx)})['train']
 
-    def train(self, model, lr, logger, epoch, id):
+    def train(self, model, lr, logger):
         metric = Metric()
-        start_time = time.time()
         model.train()
         optimizer = make_optimizer(model, lr)
         for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
@@ -148,21 +191,8 @@ class Local:
                 output['loss'].backward()
                 optimizer.step()
                 if i % int((len(self.data_loader) * cfg['log_interval']) + 1) == 0:
-                    batch_time = time.time() - start_time
-                    lr = optimizer.param_groups[0]['lr']
-                    local_epoch_finished_time = datetime.timedelta(
-                        seconds=round(batch_time * (len(self.data_loader) - i - 1)))
-                    local_finished_time = local_epoch_finished_time + datetime.timedelta(
-                        seconds=round((cfg['num_epochs']['local'] - local_epoch) * batch_time * len(self.data_loader)))
-                    info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                                     'ID: {}, Local/Global Epoch: {}/{}({:.0f}%)'.format(
-                                         id, local_epoch, epoch, 100. * (i + 1) / len(self.data_loader)),
-                                     'Learning rate: {}'.format(lr), 'Local Epoch Finished Time: {}'.format(
-                            local_epoch_finished_time), 'Local Finished Time: {}'.format(local_finished_time)]}
-                    logger.append(info, 'train', mean=False)
                     evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
                     logger.append(evaluation, 'train', n=input_size)
-                    logger.write('train', cfg['metric_name']['train'])
         return
 
 

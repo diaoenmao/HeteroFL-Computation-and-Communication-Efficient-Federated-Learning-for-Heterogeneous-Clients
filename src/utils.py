@@ -105,13 +105,15 @@ def process_dataset(dataset):
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
     if cfg['optimizer_name'] == 'SGD':
-        cfg['lr'] = 1e-1
+        cfg['lr'] = 1e-2
         cfg['scheduler_name'] = 'CosineAnnealingLR'
-        cfg['weight_decay'] = 1e-4
+        cfg['weight_decay'] = 0
+        cfg['min_lr'] = 0
     elif cfg['optimizer_name'] == 'Adam':
-        cfg['lr'] = 1e-3
+        cfg['lr'] = 3e-4
         cfg['scheduler_name'] = 'ReduceLROnPlateau'
-        cfg['weight_decay'] = 1e-4
+        cfg['weight_decay'] = 0
+        cfg['min_lr'] = 1e-5
     else:
         raise ValueError('Not valid optimizer')
     cfg['split'] = cfg['control']['split']
@@ -273,25 +275,43 @@ def make_scheduler(optimizer):
 
 
 def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoint', verbose=True):
-    if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
-        checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
-        last_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_dict'])
-        if optimizer is not None:
-            optimizer.load_state_dict(checkpoint['optimizer_dict'])
-        if scheduler is not None:
-            scheduler.load_state_dict(checkpoint['scheduler_dict'])
-        logger = checkpoint['logger']
-        if verbose:
-            print('Resume from {}'.format(last_epoch))
+    if cfg['split'] != 'none':
+        if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
+            checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
+            last_epoch = checkpoint['epoch']
+            data_split = checkpoint['data_split']
+            federation = checkpoint['federation']
+            model.load_state_dict(checkpoint['model_dict'])
+            if optimizer is not None:
+                optimizer.load_state_dict(checkpoint['optimizer_dict'])
+            if scheduler is not None:
+                scheduler.load_state_dict(checkpoint['scheduler_dict'])
+            logger = checkpoint['logger']
+            if verbose:
+                print('Resume from {}'.format(last_epoch))
+        else:
+            raise ValueError('Not valid resume')
+        return last_epoch, data_split, federation, model, optimizer, scheduler, logger
     else:
-        print('Not exists model tag: {}, start from scratch'.format(model_tag))
-        from datetime import datetime
-        from logger import Logger
-        last_epoch = 1
-        logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
-        logger = Logger(logger_path)
-    return last_epoch, model, optimizer, scheduler, logger
+        if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
+            checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
+            last_epoch = checkpoint['epoch']
+            model.load_state_dict(checkpoint['model_dict'])
+            if optimizer is not None:
+                optimizer.load_state_dict(checkpoint['optimizer_dict'])
+            if scheduler is not None:
+                scheduler.load_state_dict(checkpoint['scheduler_dict'])
+            logger = checkpoint['logger']
+            if verbose:
+                print('Resume from {}'.format(last_epoch))
+        else:
+            print('Not exists model tag: {}, start from scratch'.format(model_tag))
+            from datetime import datetime
+            from logger import Logger
+            last_epoch = 1
+            logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
+            logger = Logger(logger_path)
+        return last_epoch, model, optimizer, scheduler, logger
 
 
 def collate(input):
