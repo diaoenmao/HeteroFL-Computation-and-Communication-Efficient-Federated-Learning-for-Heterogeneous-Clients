@@ -95,41 +95,12 @@ def runExperiment():
     return
 
 
-# def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
-#     global_model.train(True)
-#     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
-#     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-#     local_parameters = [None for _ in range(num_active_users)]
-#     for m in range(num_active_users):
-#         start_time = time.time()
-#         local = Local(dataset, data_split[user_idx[m]])
-#         local_parameters[m] = federation.distribute(user_idx[m])
-#         local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
-#         local_model.load_state_dict(local_parameters[m])
-#         local.train(local_model, optimizer.param_groups[0]['lr'], logger)
-#         local_parameters[m] = copy.deepcopy(local_model.state_dict())
-#         local_time = time.time() - start_time
-#         lr = optimizer.param_groups[0]['lr']
-#         epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
-#         exp_finished_time = epoch_finished_time + datetime.timedelta(
-#             seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
-#         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
-#                          'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
-#                          'Learning rate: {}'.format(lr),
-#                          'Epoch Finished Time: {}'.format(epoch_finished_time),
-#                          'Experiment Finished Time: {}'.format(exp_finished_time)]}
-#         logger.append(info, 'train', mean=False)
-#         logger.write('train', cfg['metric_name']['train'])
-#     federation.combine(local_parameters, user_idx)
-#     global_model.load_state_dict(federation.global_parameters)
-#     return
-
 def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
     global_model.load_state_dict(federation.global_parameters)
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters = federation.distribute(num_active_users)
+    local_parameters = federation.distribute(user_idx)
     for m in range(num_active_users):
         start_time = time.time()
         local = Local(dataset, data_split[user_idx[m]])
@@ -149,7 +120,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
                          'Experiment Finished Time: {}'.format(exp_finished_time)]}
         logger.append(info, 'train', mean=False)
         logger.write('train', cfg['metric_name']['train'])
-    federation.combine(local_parameters)
+    federation.combine(local_parameters, user_idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 
