@@ -67,7 +67,7 @@ def runExperiment():
     else:
         last_epoch = 1
         data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
-        federation = Federation(cfg['num_users'], global_parameters, cfg['rate'])
+        federation = Federation(global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
@@ -100,7 +100,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters = federation.distribute(user_idx)
+    local_parameters, model_idx = federation.distribute(num_active_users)
     for m in range(num_active_users):
         start_time = time.time()
         local = Local(dataset, data_split[user_idx[m]])
@@ -114,13 +114,14 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
         exp_finished_time = epoch_finished_time + datetime.timedelta(
             seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
-                         'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
+                         'User ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
+                         'Model ID: {}/{}'.format(model_idx[m], federation.num_models - 1),
                          'Learning rate: {}'.format(lr),
                          'Epoch Finished Time: {}'.format(epoch_finished_time),
                          'Experiment Finished Time: {}'.format(exp_finished_time)]}
         logger.append(info, 'train', mean=False)
         logger.write('train', cfg['metric_name']['train'])
-    federation.combine(local_parameters, user_idx)
+    federation.combine(local_parameters, model_idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 
