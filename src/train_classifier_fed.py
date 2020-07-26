@@ -76,7 +76,7 @@ def runExperiment():
         train(dataset['train'], data_split, federation, model, optimizer, logger, epoch)
         test(data_loader['test'], model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
-            scheduler.step(metrics=logger.tracker['test/{}'.format(cfg['pivot_metric'])])
+            scheduler.step(metrics=logger.tracker['train/{}'.format(cfg['pivot_metric'])])
         else:
             scheduler.step()
         logger.safe(False)
@@ -100,7 +100,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters, model_idx = federation.distribute(num_active_users)
+    local_parameters, idx = federation.distribute(num_active_users)
     for m in range(num_active_users):
         start_time = time.time()
         local = Local(dataset, data_split[user_idx[m]])
@@ -108,20 +108,20 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
         local_model.load_state_dict(local_parameters[m])
         local.train(local_model, optimizer.param_groups[0]['lr'], logger)
         local_parameters[m] = copy.deepcopy(local_model.state_dict())
-        local_time = time.time() - start_time
-        lr = optimizer.param_groups[0]['lr']
-        epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
-        exp_finished_time = epoch_finished_time + datetime.timedelta(
-            seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
-        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
-                         'User ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
-                         'Model ID: {}/{}'.format(model_idx[m], federation.num_models - 1),
-                         'Learning rate: {}'.format(lr),
-                         'Epoch Finished Time: {}'.format(epoch_finished_time),
-                         'Experiment Finished Time: {}'.format(exp_finished_time)]}
-        logger.append(info, 'train', mean=False)
-        logger.write('train', cfg['metric_name']['train'])
-    federation.combine(local_parameters, model_idx)
+        if m % int((num_active_users * cfg['log_interval']) + 1) == 0:
+            local_time = time.time() - start_time
+            lr = optimizer.param_groups[0]['lr']
+            epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
+            exp_finished_time = epoch_finished_time + datetime.timedelta(
+                seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
+            info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
+                             'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
+                             'Learning rate: {}'.format(lr),
+                             'Epoch Finished Time: {}'.format(epoch_finished_time),
+                             'Experiment Finished Time: {}'.format(exp_finished_time)]}
+            logger.append(info, 'train', mean=False)
+            logger.write('train', cfg['metric_name']['train'])
+    federation.combine(local_parameters, idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 

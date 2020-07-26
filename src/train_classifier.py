@@ -72,7 +72,7 @@ def runExperiment():
         train(data_loader['train'], model, optimizer, logger, epoch)
         test(data_loader['test'], model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
-            scheduler.step(metrics=logger.tracker['test/{}'.format(cfg['pivot_metric'])])
+            scheduler.step(metrics=logger.tracker['train/{}'.format(cfg['pivot_metric'])])
         else:
             scheduler.step()
         logger.safe(False)
@@ -133,8 +133,7 @@ def test(data_loader, model, logger, epoch):
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
             evaluation = metric.evaluate(cfg['metric_name']['test'], input, output)
             logger.append(evaluation, 'test', input_size)
-        info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                         'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
+        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
         logger.write('test', cfg['metric_name']['test'])
     return

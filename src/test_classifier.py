@@ -74,8 +74,7 @@ def test(data_loader, model, logger, epoch):
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
             evaluation = metric.evaluate(cfg['metric_name']['test'], input, output)
             logger.append(evaluation, 'test', input_size)
-        info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                         'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
+        info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
         logger.write('test', cfg['metric_name']['test'])
     return

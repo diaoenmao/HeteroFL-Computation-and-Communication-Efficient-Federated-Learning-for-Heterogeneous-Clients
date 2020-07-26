@@ -6,4 +6,3 @@ def init_param(m):
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0.0)
     return m
-

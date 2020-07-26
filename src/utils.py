@@ -154,7 +154,6 @@ def process_control():
             raise ValueError('Not valid dataset')
         cfg[cfg['model_name']]['local']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
                                                           cfg[cfg['model_name']]['global']['hidden_size']]
-        cfg['log_interval'] = 1
     else:
         if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
             cfg['data_shape'] = [1, 28, 28]
@@ -188,7 +187,6 @@ def process_control():
             raise ValueError('Not valid dataset')
         cfg[cfg['model_name']]['global']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
                                                            cfg[cfg['model_name']]['global']['hidden_size']]
-        cfg['log_interval'] = 0.25
     return
 
 

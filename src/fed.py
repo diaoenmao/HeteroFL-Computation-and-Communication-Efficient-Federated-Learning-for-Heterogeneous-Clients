@@ -8,62 +8,56 @@ class Federation:
     def __init__(self, global_parameters, rate):
         self.global_parameters = global_parameters
         self.rate = rate
-        self.num_models = int(1 / self.rate) ** 2
-        self.idx = self.split_model()
 
-    def split_model(self):
-        idx_i = None
-        idx = [OrderedDict() for _ in range(self.num_models)]
+    def split_model(self, num_active_users):
+        idx_i = [None for _ in range(num_active_users)]
+        idx = [OrderedDict() for _ in range(num_active_users)]
         output_weight = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
-            if parameter_type in ['weight', 'bias']:
-                if parameter_type == 'weight':
-                    if v.dim() > 1:
-                        input_size = v.size(1)
-                        output_size = v.size(0)
-                        if idx_i is None:
-                            idx_i = [torch.arange(input_size, device=v.device) for _ in range(self.num_models)]
-                        input_idx_i = idx_i
-                        if k == output_weight:
-                            output_idx_i = [torch.arange(output_size, device=v.device) for _ in range(self.num_models)]
-                            idx_i = output_idx_i
-                        else:
-                            half_output_idx_i = torch.chunk(torch.arange(output_size, device=v.device),
-                                                            int(np.sqrt(self.num_models)))
-                            output_idx_i = half_output_idx_i + half_output_idx_i[::-1]
-                            idx_i = half_output_idx_i + half_output_idx_i
-                        for m in range(self.num_models):
-                            idx[m][k] = torch.meshgrid(output_idx_i[m], input_idx_i[m])
-                    else:
-                        input_idx_i = idx_i
-                        for m in range(self.num_models):
-                            idx[m][k] = input_idx_i[m]
-                else:
-                    input_idx_i = idx_i
-                    for m in range(self.num_models):
-                        idx[m][k] = input_idx_i[m]
-        return idx
-
-    def distribute(self, num_active_users):
-        local_parameters = [OrderedDict() for _ in range(num_active_users)]
-        model_idx = np.random.choice(range(self.num_models), num_active_users, replace=True)
-        for k, v in self.global_parameters.items():
-            parameter_type = k.split('.')[-1]
-            for m in range(len(model_idx)):
+            for m in range(num_active_users):
                 if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
-                            local_parameters[m][k] = copy.deepcopy(v[self.idx[model_idx[m]][k]])
+                            input_size = v.size(1)
+                            output_size = v.size(0)
+                            if idx_i[m] is None:
+                                idx_i[m] = torch.arange(input_size, device=v.device)
+                            input_idx_i_m = idx_i[m]
+                            if k == output_weight:
+                                output_idx_i_m = torch.arange(output_size, device=v.device)
+                            else:
+                                local_output_size = int(np.ceil(output_size * self.rate))
+                                output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
+                            idx[m][k] = torch.meshgrid(output_idx_i_m, input_idx_i_m)
+                            idx_i[m] = output_idx_i_m
                         else:
-                            local_parameters[m][k] = copy.deepcopy(v[self.idx[model_idx[m]][k]])
+                            input_idx_i_m = idx_i[m]
+                            idx[m][k] = input_idx_i_m
                     else:
-                        local_parameters[m][k] = copy.deepcopy(v[self.idx[model_idx[m]][k]])
+                        input_idx_i_m = idx_i[m]
+                        idx[m][k] = input_idx_i_m
+        return idx
+
+    def distribute(self, num_active_users):
+        idx = self.split_model(num_active_users)
+        local_parameters = [OrderedDict() for _ in range(num_active_users)]
+        for k, v in self.global_parameters.items():
+            parameter_type = k.split('.')[-1]
+            for m in range(num_active_users):
+                if parameter_type in ['weight', 'bias']:
+                    if parameter_type == 'weight':
+                        if v.dim() > 1:
+                            local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                        else:
+                            local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                    else:
+                        local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
                 else:
                     local_parameters[m][k] = copy.deepcopy(v)
-        return local_parameters, model_idx
+        return local_parameters, idx
 
-    def combine(self, local_parameters, model_idx):
+    def combine(self, local_parameters, idx):
         count = OrderedDict()
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
@@ -71,8 +65,8 @@ class Federation:
             tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(len(local_parameters)):
                 if parameter_type in ['weight', 'bias']:
-                    tmp_v[self.idx[model_idx[m]][k]] += local_parameters[m][k]
-                    count[k][self.idx[model_idx[m]][k]] += 1
+                    tmp_v[idx[m][k]] += local_parameters[m][k]
+                    count[k][idx[m][k]] += 1
                 else:
                     tmp_v += local_parameters[m][k]
                     count[k] += 1

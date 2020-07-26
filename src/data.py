@@ -110,7 +110,7 @@ def split_dataset(dataset, num_users, split):
 def make_data_loader(dataset):
     data_loader = {}
     for k in dataset:
-        data_loader[k] = torch.utils.data.DataLoader(dataset=dataset['train'], shuffle=cfg['shuffle'][k],
+        data_loader[k] = torch.utils.data.DataLoader(dataset=dataset[k], shuffle=cfg['shuffle'][k],
                                                      batch_size=cfg['batch_size'][k], pin_memory=True,
                                                      num_workers=cfg['num_workers'], collate_fn=input_collate)
     return data_loader
