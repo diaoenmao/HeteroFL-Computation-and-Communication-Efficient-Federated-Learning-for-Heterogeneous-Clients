@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,18 +11,18 @@ Activation = nn.ReLU
 
 
 class Conv(nn.Module):
-    def __init__(self, data_shape, hidden_size, classes_size):
+    def __init__(self, data_shape, hidden_size, classes_size, rate):
         super().__init__()
         blocks = [nn.Conv2d(data_shape[0], hidden_size[0], 3, 1, 1),
                   Normalization(hidden_size[0], track_running_stats=False),
                   Activation(inplace=True),
-                  Scaler(cfg['rate']),
+                  Scaler(rate),
                   nn.MaxPool2d(2)]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Conv2d(hidden_size[i], hidden_size[i + 1], 3, 1, 1),
                            Normalization(hidden_size[i + 1], track_running_stats=False),
                            Activation(inplace=True),
-                           Scaler(cfg['rate']),
+                           Scaler(rate),
                            nn.MaxPool2d(2)])
         blocks = blocks[:-1]
         blocks.extend([nn.AdaptiveAvgPool2d(1),
@@ -37,11 +38,11 @@ class Conv(nn.Module):
         return output
 
 
-def conv(mode='global'):
+def conv(rate=1):
     data_shape = cfg['data_shape']
-    hidden_size = cfg['conv'][mode]['hidden_size']
+    hidden_size = [int(np.ceil(rate * x)) for x in cfg['conv']['hidden_size']]
     classes_size = cfg['classes_size']
     cfg['model'] = {}
-    model = Conv(data_shape, hidden_size, classes_size)
+    model = Conv(data_shape, hidden_size, classes_size, rate)
     model.apply(init_param)
     return model

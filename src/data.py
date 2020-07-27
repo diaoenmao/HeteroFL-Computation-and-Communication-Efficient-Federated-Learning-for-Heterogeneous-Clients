@@ -78,15 +78,15 @@ def input_collate(batch):
         return default_collate(batch)
 
 
-def split_dataset(dataset, num_users, split):
-    if split == 'iid':
+def split_dataset(dataset, num_users, data_split_mode):
+    if data_split_mode == 'iid':
         num_items = round(len(dataset) / num_users)
         data_split, idx = {}, [i for i in range(len(dataset))]
         for i in range(num_users):
             num_items_i = min(len(idx), num_items)
             data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
             idx = list(set(idx) - set(data_split[i]))
-    elif split == 'non-iid':
+    elif data_split_mode == 'non-iid':
         num_items = round(len(dataset) / num_users)
         idx_shard = [i for i in range(0, len(dataset), num_items // 2)]
         data_split, idx = {}, np.arange(0, len(dataset))
@@ -98,7 +98,7 @@ def split_dataset(dataset, num_users, split):
             idx_shard = list(set(idx_shard) - set(pivot))
             data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
                             idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
-    elif split == 'none':
+    elif data_split_mode == 'none':
         data_split = {}
         for i in range(num_users):
             data_split[i] = [i for i in range(len(dataset))]

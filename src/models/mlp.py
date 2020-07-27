@@ -11,18 +11,18 @@ Activation = nn.ReLU
 
 
 class MLP(nn.Module):
-    def __init__(self, data_shape, hidden_size, classes_size):
+    def __init__(self, data_shape, hidden_size, classes_size, rate):
         super().__init__()
         blocks = [nn.Flatten(),
                   nn.Linear(np.prod(data_shape), hidden_size[0]),
                   Normalization(hidden_size[0], track_running_stats=False),
                   Activation(inplace=True),
-                  Scaler(cfg['rate'])]
+                  Scaler(rate)]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Linear(hidden_size[i], hidden_size[i + 1]),
                            Normalization(hidden_size[i + 1], track_running_stats=False),
                            Activation(inplace=True),
-                           Scaler(cfg['rate'])])
+                           Scaler(rate)])
         blocks.extend([nn.Linear(hidden_size[-1], classes_size)])
         self.blocks = nn.Sequential(*blocks)
 
@@ -34,11 +34,11 @@ class MLP(nn.Module):
         return output
 
 
-def mlp(mode='global'):
+def mlp(rate=1):
     data_shape = cfg['data_shape']
-    hidden_size = cfg['mlp'][mode]['hidden_size']
+    hidden_size = [int(np.ceil(rate * x)) for x in cfg['mlp']['hidden_size']]
     classes_size = cfg['classes_size']
     cfg['model'] = {}
-    model = MLP(data_shape, hidden_size, classes_size)
+    model = MLP(data_shape, hidden_size, classes_size, rate)
     model.apply(init_param)
     return model

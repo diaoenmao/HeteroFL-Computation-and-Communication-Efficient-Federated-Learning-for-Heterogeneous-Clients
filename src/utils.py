@@ -116,30 +116,36 @@ def process_control():
         cfg['min_lr'] = 1e-5
     else:
         raise ValueError('Not valid optimizer')
-    cfg['split'] = cfg['control']['split']
     cfg['num_users'] = int(cfg['control']['num_users'])
     cfg['frac'] = float(cfg['control']['frac'])
-    cfg['rate'] = float(cfg['control']['rate'])
+    cfg['data_split_mode'] = cfg['control']['data_split_mode']
+    cfg['model_split_mode'] = cfg['control']['model_split_mode']
+    mode_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
+    cfg['rate'] = []
+    for m in cfg['model_split_mode']:
+        cfg['rate'].append(mode_split_rate[m])
+    cfg['rate'] = np.repeat(cfg['rate'], cfg['num_users'] // len(cfg['rate'])).tolist()
+    cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
     cfg[cfg['model_name']] = {'global': {}, 'local': {}}
-    if cfg['split'] != 'none':
+    if cfg['data_split_mode'] != 'none':
         if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
             cfg['data_shape'] = [1, 28, 28]
             cfg['num_epochs'] = {'global': 200, 'local': 10}
-            cfg['batch_size'] = {'train': 16, 'test': 512}
+            cfg['batch_size'] = {'train': 16, 'test': 128}
             if cfg['model_name'] == 'mlp':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+                cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
             elif cfg['model_name'] == 'conv':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+                cfg[cfg['model_name']]['hidden_size'] = [64, 128, 256, 512]
             else:
                 raise ValueError('Not valid model name')
         elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
             cfg['data_shape'] = [3, 32, 32]
             cfg['num_epochs'] = {'global': 200, 'local': 10}
-            cfg['batch_size'] = {'train': 16, 'test': 512}
+            cfg['batch_size'] = {'train': 16, 'test': 128}
             if cfg['model_name'] == 'mlp':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+                cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
             elif cfg['model_name'] == 'conv':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+                cfg[cfg['model_name']]['hidden_size'] = [64, 128, 256, 512]
             else:
                 raise ValueError('Not valid model name')
         elif cfg['data_name'] in ['ImageNet']:
@@ -152,27 +158,25 @@ def process_control():
                 raise ValueError('Not valid model name')
         else:
             raise ValueError('Not valid dataset')
-        cfg[cfg['model_name']]['local']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
-                                                          cfg[cfg['model_name']]['global']['hidden_size']]
     else:
         if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
             cfg['data_shape'] = [1, 28, 28]
             cfg['num_epochs'] = {'global': 200}
-            cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['batch_size'] = {'train': 128, 'test': 256}
             if cfg['model_name'] == 'mlp':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+                cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
             elif cfg['model_name'] == 'conv':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+                cfg[cfg['model_name']]['hidden_size'] = [64, 128, 256, 512]
             else:
                 raise ValueError('Not valid model name')
         elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
             cfg['data_shape'] = [3, 32, 32]
             cfg['num_epochs'] = {'global': 200}
-            cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['batch_size'] = {'train': 128, 'test': 256}
             if cfg['model_name'] == 'mlp':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [512, 256, 128]
+                cfg[cfg['model_name']]['hidden_size'] = [512, 256, 128]
             elif cfg['model_name'] == 'conv':
-                cfg[cfg['model_name']]['global']['hidden_size'] = [64, 128, 256, 512]
+                cfg[cfg['model_name']]['hidden_size'] = [64, 128, 256, 512]
             else:
                 raise ValueError('Not valid model name')
         elif cfg['data_name'] in ['ImageNet']:
@@ -185,8 +189,6 @@ def process_control():
                 raise ValueError('Not valid model name')
         else:
             raise ValueError('Not valid dataset')
-        cfg[cfg['model_name']]['global']['hidden_size'] = [int(np.ceil(cfg['rate'] * x)) for x in
-                                                           cfg[cfg['model_name']]['global']['hidden_size']]
     return
 
 

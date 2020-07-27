@@ -2,10 +2,10 @@
 # control
 control:
   optimizer_name: 'Adam'
-  split: 'iid'
   num_users: '100'
   frac: '0.1'
-  rate: '0.5'
+  data_split_mode: 'iid'
+  model_split_mode: 'abcde'
 # data
 data_name: CIFAR10
 subset: label

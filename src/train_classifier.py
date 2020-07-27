@@ -49,7 +49,7 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}("global").to(cfg["device"])'.format(cfg['model_name']))
+    model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     if cfg['resume_mode'] == 1:
@@ -104,6 +104,8 @@ def train(data_loader, model, optimizer, logger, epoch):
         output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
         output['loss'].backward()
         optimizer.step()
+        evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
+        logger.append(evaluation, 'train', n=input_size)
         if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
             batch_time = time.time() - start_time
             lr = optimizer.param_groups[0]['lr']
@@ -115,8 +117,6 @@ def train(data_loader, model, optimizer, logger, epoch):
                              'Learning rate: {}'.format(lr), 'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
-            evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
-            logger.append(evaluation, 'train', n=input_size)
             logger.write('train', cfg['metric_name']['train'])
     return
 

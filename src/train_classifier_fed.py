@@ -51,7 +51,7 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}("global").to(cfg["device"])'.format(cfg['model_name']))
+    model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
@@ -66,7 +66,7 @@ def runExperiment():
         logger = Logger(logger_path)
     else:
         last_epoch = 1
-        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['split'])
+        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
         federation = Federation(global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
@@ -100,11 +100,11 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
     global_model.train(True)
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters, idx = federation.distribute(num_active_users)
+    local_parameters, idx = federation.distribute(user_idx)
     for m in range(num_active_users):
         start_time = time.time()
         local = Local(dataset, data_split[user_idx[m]])
-        local_model = eval('models.{}("local").to(cfg["device"])'.format(cfg['model_name']))
+        local_model = eval('models.{}(cfg["rate"][user_idx[m]]).to(cfg["device"])'.format(cfg['model_name']))
         local_model.load_state_dict(local_parameters[m])
         local.train(local_model, optimizer.param_groups[0]['lr'], logger)
         local_parameters[m] = copy.deepcopy(local_model.state_dict())
@@ -117,6 +117,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
                              'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
                              'Learning rate: {}'.format(lr),
+                             'Rate: {}'.format(cfg['rate'][user_idx[m]]),
                              'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
@@ -162,9 +163,8 @@ class Local:
                 output = model(input)
                 output['loss'].backward()
                 optimizer.step()
-                if i % int((len(self.data_loader) * cfg['log_interval']) + 1) == 0:
-                    evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
-                    logger.append(evaluation, 'train', n=input_size)
+                evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
+                logger.append(evaluation, 'train', n=input_size)
         return
 
 

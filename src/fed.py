@@ -9,13 +9,13 @@ class Federation:
         self.global_parameters = global_parameters
         self.rate = rate
 
-    def split_model(self, num_active_users):
-        idx_i = [None for _ in range(num_active_users)]
-        idx = [OrderedDict() for _ in range(num_active_users)]
+    def split_model(self, user_idx):
+        idx_i = [None for _ in range(len(user_idx))]
+        idx = [OrderedDict() for _ in range(len(user_idx))]
         output_weight = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
-            for m in range(num_active_users):
+            for m in range(len(user_idx)):
                 if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
@@ -27,7 +27,7 @@ class Federation:
                             if k == output_weight:
                                 output_idx_i_m = torch.arange(output_size, device=v.device)
                             else:
-                                local_output_size = int(np.ceil(output_size * self.rate))
+                                local_output_size = int(np.ceil(output_size * self.rate[user_idx[m]]))
                                 output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
                             idx[m][k] = torch.meshgrid(output_idx_i_m, input_idx_i_m)
                             idx_i[m] = output_idx_i_m
@@ -39,12 +39,12 @@ class Federation:
                         idx[m][k] = input_idx_i_m
         return idx
 
-    def distribute(self, num_active_users):
-        idx = self.split_model(num_active_users)
-        local_parameters = [OrderedDict() for _ in range(num_active_users)]
+    def distribute(self, user_idx):
+        idx = self.split_model(user_idx)
+        local_parameters = [OrderedDict() for _ in range(len(user_idx))]
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
-            for m in range(num_active_users):
+            for m in range(len(user_idx)):
                 if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
