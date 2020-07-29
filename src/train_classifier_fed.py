@@ -71,6 +71,10 @@ def runExperiment():
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
+    if data_split is None:
+        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+    if federation is None:
+        federation = Federation(global_parameters, cfg['rate'])
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
         train(dataset['train'], data_split, federation, model, optimizer, logger, epoch)

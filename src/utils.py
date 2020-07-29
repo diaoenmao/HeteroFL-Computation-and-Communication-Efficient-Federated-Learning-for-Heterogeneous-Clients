@@ -105,15 +105,21 @@ def process_dataset(dataset):
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
     if cfg['optimizer_name'] == 'SGD':
-        cfg['lr'] = 1e-2
-        cfg['scheduler_name'] = 'CosineAnnealingLR'
-        cfg['weight_decay'] = 0
-        cfg['min_lr'] = 0
+        cfg['lr'] = 1e-1
+        cfg['momentum'] = 0.9
+        cfg['weight_decay'] = 5e-4
+        cfg['scheduler_name'] = 'MultiStepLR'
+        cfg['milestones'] = [100, 200]
+        cfg['factor'] = 0.1
+        cfg['num_epochs'] = 300
     elif cfg['optimizer_name'] == 'Adam':
         cfg['lr'] = 3e-4
+        cfg['betas'] = (0.9, 0.999)
+        cfg['weight_decay'] = 5e-4
         cfg['scheduler_name'] = 'ReduceLROnPlateau'
-        cfg['weight_decay'] = 0
+        cfg['factor'] = 0.5
         cfg['min_lr'] = 1e-5
+        cfg['num_epochs'] = 200
     else:
         raise ValueError('Not valid optimizer')
     cfg['num_users'] = int(cfg['control']['num_users'])
@@ -126,7 +132,7 @@ def process_control():
         cfg['rate'].append(mode_split_rate[m])
     cfg['rate'] = np.repeat(cfg['rate'], cfg['num_users'] // len(cfg['rate'])).tolist()
     cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
-    cfg[cfg['model_name']] = {'global': {}, 'local': {}}
+    cfg[cfg['model_name']] = {}
     if cfg['data_split_mode'] != 'none':
         if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
             cfg['data_shape'] = [1, 28, 28]
@@ -275,7 +281,7 @@ def make_scheduler(optimizer):
 
 
 def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoint', verbose=True):
-    if cfg['split'] != 'none':
+    if cfg['data_split_mode'] != 'none':
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
             last_epoch = checkpoint['epoch']
@@ -290,7 +296,14 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
             if verbose:
                 print('Resume from {}'.format(last_epoch))
         else:
-            raise ValueError('Not valid resume')
+            print('Not exists model tag: {}, start from scratch'.format(model_tag))
+            from datetime import datetime
+            from logger import Logger
+            last_epoch = 1
+            data_split = None
+            federation = None
+            logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
+            logger = Logger(logger_path)
         return last_epoch, data_split, federation, model, optimizer, scheduler, logger
     else:
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):

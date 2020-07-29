@@ -25,10 +25,10 @@ metric_name:
     - Loss
     - Accuracy
 # optimizer
-optimizer_name: SGD
-lr: 1.0e-2
-momentum: 0.5
-weight_decay: 1.0e-5
+optimizer_name: Adam
+lr: 3.0e-4
+momentum: 0.9
+weight_decay: 5.0e-4
 # scheduler
 scheduler_name: None
 step_size: 1
