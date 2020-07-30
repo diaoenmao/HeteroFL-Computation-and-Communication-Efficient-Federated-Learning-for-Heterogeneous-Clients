@@ -126,10 +126,10 @@ def process_control():
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
     cfg['model_split_mode'] = cfg['control']['model_split_mode']
-    mode_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
+    model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
     cfg['rate'] = []
     for m in cfg['model_split_mode']:
-        cfg['rate'].append(mode_split_rate[m])
+        cfg['rate'].append(model_split_rate[m])
     cfg['rate'] = np.repeat(cfg['rate'], cfg['num_users'] // len(cfg['rate'])).tolist()
     cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
     cfg[cfg['model_name']] = {}

@@ -2,146 +2,126 @@ import os
 import itertools
 import json
 import numpy as np
-from utils import save, load
+from utils import save, load, makedir_exist_ok
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
-data_name = ['CIFAR10', 'Omniglot']
 result_path = './output/result'
-num_Experiments = 12
-control_exp = [str(x) for x in list(range(num_Experiments))]
+vis_path = './output/vis'
+num_experiments = 1
+exp = [str(x) for x in list(range(num_experiments))]
+model_split_mode = ['a', 'b', 'c', 'd', 'e']
+model_split = []
+for i in range(1, len(model_split_mode) + 1):
+    model_split_i = [''.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
+    model_split.extend(model_split_i)
+model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
+model_split_rate_key = list(model_split_rate.keys())
+model_color = {model_split_rate_key[i]: i for i in range(len(model_split_rate_key))}
+colors = cm.rainbow(np.linspace(1, 0, len(model_split_rate_key)))
+alpha = 0.75
+fig_format = 'png'
 
 
 def main():
-    extracted, summarized = {}, {}
-    for i in range(len(data_name)):
-        result_control = {
-            'CVAE': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['cvae']], 'metric': 'test/MSE'},
-            'MCVAE': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['mcvae'], ['0.5']], 'metric': 'test/MSE'},
-            'VQVAE': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['vqvae']], 'metric': 'test/MSE'},
-            'CPixelCNN': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['cpixelcnn']], 'metric': 'test/NLL'},
-            'MCPixelCNN': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['mcpixelcnn'], ['0.5']],
-                'metric': 'test/NLL'},
-            'CGLOW': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['cglow']], 'metric': 'test/Loss'},
-            'MCGLOW': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['mcglow'], ['0.5']], 'metric': 'test/Loss'},
-            'CGAN': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['cgan']], 'metric': None},
-            'MCGAN': {
-                'control_names': [control_exp, [data_name[i]], ['label'], ['mcgan'], ['0.5']], 'metric': None},
-        }
-        extracated_i, summarized_i = {}, {}
-        for result_name, info in result_control.items():
-            extracated_i[result_name], summarized_i[result_name] = extract_result(info)
-        extracted[data_name[i]] = extracated_i
-        summarized[data_name[i]] = summarized_i
-    print(summarized)
+    info = {'controls': [exp, ['MNIST', 'CIFAR10'], ['label'], ['conv'], ['Adam'],
+                         ['100'], ['0.1'], ['iid'], model_split], 'metrics': ['test/Accuracy']}
+    processed_result = process_result(info)
     with open('{}/summarized.json'.format(result_path), 'w') as fp:
-        json.dump(summarized, fp, indent=4)
-    save((extracted, summarized), '{}/processed_result.pt'.format(result_path))
-    make_img(summarized)
+        json.dump(processed_result, fp, indent=2)
+    save(processed_result, os.path.join(result_path, 'processed_result.pt'))
+    make_vis(processed_result, info['metrics'])
     return
 
 
-def extract_result(info):
-    control_names = info['control_names']
-    metric = info['metric']
-    control_names_product = list(itertools.product(*control_names))
-    extracted = {'base': np.zeros(len(control_exp)), 'is': np.zeros((len(control_exp), 2)),
-                 'fid': np.zeros(len(control_exp)), 'dbi': np.zeros(len(control_exp))}
-    for i in range(len(control_names_product)):
-        control_name = list(control_names_product[i])
-        model_tag = '_'.join(control_name)
-        if metric is not None:
-            base_result_path_i = '{}/{}.pt'.format(result_path, model_tag)
-            if os.path.exists(base_result_path_i):
-                result = load(base_result_path_i)
-                exp_idx = control_exp.index(control_names_product[i][0])
-                extracted['base'][exp_idx] = result['logger'].mean[metric]
-            else:
-                pass
-        is_result_path_i = '{}/is_{}.npy'.format(result_path, model_tag)
-        if os.path.exists(is_result_path_i):
-            result = np.load(is_result_path_i)
-            exp_idx = control_exp.index(control_names_product[i][0])
-            extracted['is'][exp_idx] = result
-        else:
-            pass
-        fid_result_path_i = '{}/fid_{}.npy'.format(result_path, model_tag)
-        if os.path.exists(fid_result_path_i):
-            result = load(fid_result_path_i, mode='numpy')
-            exp_idx = control_exp.index(control_names_product[i][0])
-            extracted['fid'][exp_idx] = result
-        dbi_result_path_i = '{}/dbi_{}.npy'.format(result_path, model_tag)
-        if os.path.exists(dbi_result_path_i):
-            result = load(dbi_result_path_i, mode='numpy')
-            exp_idx = control_exp.index(control_names_product[i][0])
-            extracted['dbi'][exp_idx] = result
-        else:
-            pass
-    best_base = np.min(extracted['base']).item()
-    best_is = np.max(extracted['is'][:, 0]).item()
-    best_fid = np.min(extracted['fid']).item()
-    best_dbi = np.min(extracted['dbi']).item()
-    best_name_base = '_'.join(control_names_product[np.argmin(extracted['base']).item()])
-    best_name_is = '_'.join(control_names_product[np.argmax(extracted['is'][:, 0]).item()])
-    best_name_fid = '_'.join(control_names_product[np.argmin(extracted['fid']).item()])
-    best_name_dbi = '_'.join(control_names_product[np.argmin(extracted['dbi']).item()])
-    summarized = {
-        'base': {'mean': np.mean(extracted['base']), 'stderr': np.std(extracted['base']) / np.sqrt(num_Experiments),
-                 'best': best_base, 'best_name': best_name_base},
-        'is': {'mean': np.mean(extracted['is'], axis=0).tolist(),
-               'stderr': (np.std(extracted['is'], axis=0) / np.sqrt(num_Experiments)).tolist(),
-               'best': best_is, 'best_name': best_name_is},
-        'fid': {'mean': np.mean(extracted['fid']), 'stderr': np.std(extracted['fid']) / np.sqrt(num_Experiments),
-                'best': best_fid, 'best_name': best_name_fid},
-        'dbi': {'mean': np.mean(extracted['dbi']), 'stderr': np.std(extracted['dbi']) / np.sqrt(num_Experiments),
-                'best': best_dbi, 'best_name': best_name_dbi}}
-
-    return extracted, summarized
+def process_result(info):
+    metrics = info['metrics']
+    controls = list(itertools.product(*info['controls']))
+    processed_result = {}
+    for control in controls:
+        model_tag = '_'.join(control)
+        result_path_i = os.path.join(result_path, '{}.pt'.format(model_tag))
+        if os.path.exists(result_path_i):
+            result = load(result_path_i)
+            extract_result(list(control), processed_result, result, metrics)
+    summarize_result([], processed_result, metrics)
+    return processed_result
 
 
-def make_img(summarized):
-    round = 4
-    num_gpu = 1
-    gpu_ids = [str(x) for x in list(range(num_gpu))]
-    filenames = ['generate', 'transit', 'create']
-    save_per_mode = {'generate': {'CIFAR10': 10, 'Omniglot': 10}, 'transit': {'CIFAR10': 10, 'Omniglot': 10},
-                     'create': {'CIFAR10': 10, 'Omniglot': 10}}
-    pivot = 'is'
-    s = '#!/bin/bash\n'
-    for filename in filenames:
-        script_name = '{}.py'.format(filename)
-        k = 0
-        for data_name in summarized:
-            summarized_d = summarized[data_name]
-            for m in summarized_d:
-                model_tag = summarized_d[m][pivot]['best_name']
-                model_tag_list = model_tag.split('_')
-                init_seed = model_tag_list[0]
-                model_name = model_tag_list[3]
-                if model_name == 'vqvae' or (filename == 'transit' and 'pixelcnn' in model_name):
-                    continue
-                if 'mc' in model_name:
-                    control_name = '0.5'
-                else:
-                    control_name = 'None'
-                controls = [init_seed, data_name, model_name, control_name, save_per_mode[filename][data_name]]
-                s = s + 'CUDA_VISIBLE_DEVICES=\"{}\" python {} --init_seed {} --data_name {} --model_name {} ' \
-                        '--control_name {} --save_per_mode {}&\n'.format(
-                    gpu_ids[k % len(gpu_ids)], script_name, *controls)
-                if k % round == round - 1:
-                    s = s[:-2] + '\n'
-                k = k + 1
-    print(s)
-    run_file = open('./make_img.sh', 'w')
-    run_file.write(s)
-    run_file.close()
+def extract_result(control, processed_result, result, metrics):
+    if len(control) == 1:
+        for metric in metrics:
+            if metric not in processed_result:
+                processed_result[metric] = {'exp': np.zeros(num_experiments)}
+            exp_idx = exp.index(control[0])
+            processed_result[metric]['exp'][exp_idx] = result['logger'].mean[metric]
+    else:
+        if control[1] not in processed_result:
+            processed_result[control[1]] = {}
+        extract_result([control[0]] + control[2:], processed_result[control[1]], result, metrics)
     return
+
+
+def summarize_result(controls, processed_result, metrics):
+    if metrics[0] in processed_result:
+        for metric in metrics:
+            processed_result[metric]['mean'] = np.mean(processed_result[metric]['exp']).item()
+            processed_result[metric]['std'] = np.std(processed_result[metric]['exp']).item()
+            processed_result[metric]['max'] = np.max(processed_result[metric]['exp']).item()
+            processed_result[metric]['min'] = np.min(processed_result[metric]['exp']).item()
+            argmax = np.argmax(processed_result[metric]['exp']).item()
+            argmin = np.argmin(processed_result[metric]['exp']).item()
+            processed_result[metric]['argmax'] = '_'.join([str(argmax)] + controls)
+            processed_result[metric]['argmin'] = '_'.join([str(argmin)] + controls)
+            processed_result[metric]['exp'] = processed_result[metric]['exp'].tolist()
+    else:
+        for k, v in processed_result.items():
+            summarize_result(controls + [k], v, metrics)
+    return
+
+
+def make_vis(processed_result, metrics):
+    fig = {}
+    vis_result(fig, [], processed_result, metrics)
+    for k, v in fig.items():
+        metric_name = k.split('_')[-1].split('/')
+        save_fig_name = '_'.join(k.split('_')[:-1] + ['_'.join(metric_name)])
+        fig[k] = plt.figure(k)
+        plt.xlabel('rate')
+        plt.ylabel(metric_name[-1])
+        plt.grid()
+        fig_path = '{}/{}.{}'.format(vis_path, save_fig_name, fig_format)
+        makedir_exist_ok(vis_path)
+        fig[k].savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.close(k)
+    return
+
+
+def vis_result(fig, controls, processed_result, metrics):
+    if metrics[0] in processed_result:
+        for metric in metrics:
+            control_name = controls[-1]
+            x = control_name_to_rate(control_name)
+            y_mean = processed_result[metric]['mean']
+            y_std = processed_result[metric]['std']
+            area = y_std + 100
+            color = colors[model_color[control_name[0]]]
+            fig_name = '_'.join(controls[:-1] + [metric])
+            fig[fig_name] = plt.figure(fig_name)
+            plt.scatter(x, y_mean, s=area, c=color.reshape(1, -1), alpha=alpha)
+            plt.text(x, y_mean, control_name, fontsize=5)
+    else:
+        for k, v in processed_result.items():
+            vis_result(fig, controls + [k], v, metrics)
+    return
+
+
+def control_name_to_rate(control_name):
+    rate = 0
+    for c in control_name:
+        rate += model_split_rate[c] ** 2
+    rate /= len(control_name)
+    return rate
 
 
 if __name__ == '__main__':
