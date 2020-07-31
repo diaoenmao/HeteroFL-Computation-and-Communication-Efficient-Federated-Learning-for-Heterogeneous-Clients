@@ -1,4 +1,4 @@
-from .mlp import mlp
-from .conv import conv
-# from .resnet import resnet
+from .mlp import *
+from .conv import *
+from .resnet import *
 # from .efficientnet import efficientnet

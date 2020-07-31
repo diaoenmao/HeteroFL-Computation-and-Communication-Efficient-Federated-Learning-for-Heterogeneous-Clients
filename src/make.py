@@ -38,15 +38,21 @@ def main():
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
     resume_mode = [[resume_mode]]
-    model_split_mode = ['a', 'b', 'c', 'd', 'e']
+    model_split_mode = ['a1', 'b1', 'c1', 'd1', 'e1']
     model_split = []
     for i in range(1, len(model_split_mode) + 1):
-        model_split_i = [''.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
+        model_split_i = ['-'.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
         model_split.extend(model_split_i)
+    pivot = 'a'
+    exterior = ['b', 'c', 'd', 'e']
+    extreme = []
+    for i in range(1, 5):
+        for e in exterior:
+            extreme += ['{}{}-'.format(pivot, i)+'{}{}'.format(e, 10-i)]
     if fed:
-        control_name = [['Adam'], ['100'], ['0.1'], ['iid'], model_split]
+        control_name = [['SGD'], ['100'], ['0.1'], ['iid'], model_split + extreme]
     else:
-        control_name = [['Adam'], ['1'], ['1'], ['none'], model_split_mode]
+        control_name = [['SGD'], ['1'], ['1'], ['none'], model_split_mode]
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names

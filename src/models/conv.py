@@ -6,22 +6,19 @@ from config import cfg
 from .utils import init_param
 from modules import Scaler
 
-Normalization = nn.BatchNorm2d
-Activation = nn.ReLU
-
 
 class Conv(nn.Module):
     def __init__(self, data_shape, hidden_size, classes_size, rate):
         super().__init__()
         blocks = [nn.Conv2d(data_shape[0], hidden_size[0], 3, 1, 1),
-                  Normalization(hidden_size[0], track_running_stats=False),
-                  Activation(inplace=True),
+                  nn.BatchNorm2d(hidden_size[0], track_running_stats=False),
+                  nn.ReLU(inplace=True),
                   Scaler(rate),
                   nn.MaxPool2d(2)]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Conv2d(hidden_size[i], hidden_size[i + 1], 3, 1, 1),
-                           Normalization(hidden_size[i + 1], track_running_stats=False),
-                           Activation(inplace=True),
+                           nn.BatchNorm2d(hidden_size[i + 1], track_running_stats=False),
+                           nn.ReLU(inplace=True),
                            Scaler(rate),
                            nn.MaxPool2d(2)])
         blocks = blocks[:-1]
@@ -33,8 +30,8 @@ class Conv(nn.Module):
     def forward(self, input):
         output = {'loss': torch.tensor(0, device=cfg['device'], dtype=torch.float32)}
         x = input['img']
-        output['label'] = self.blocks(x)
-        output['loss'] = F.cross_entropy(output['label'], input['label'], reduction='mean')
+        output['score'] = self.blocks(x)
+        output['loss'] = F.cross_entropy(output['score'], input['label'], reduction='mean')
         return output
 
 

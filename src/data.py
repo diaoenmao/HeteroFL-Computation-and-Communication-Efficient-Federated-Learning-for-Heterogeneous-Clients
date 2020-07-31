@@ -11,60 +11,43 @@ def fetch_dataset(data_name, subset):
     dataset = {}
     print('fetching data {}...'.format(data_name))
     root = './data/{}'.format(data_name)
-    if data_name in ['MNIST', 'FashionMNIST', 'SVHN']:
-        dataset['train'] = eval('datasets.{}(root=root, split=\'train\', subset=subset,'
-                                'transform=datasets.Compose([''transforms.ToTensor()]))'.format(data_name))
-        dataset['test'] = eval('datasets.{}(root=root, split=\'test\', subset=subset,'
-                               'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
-        cfg['transform'] = {
-            'train': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]),
-            'test': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-        }
-    elif data_name == 'EMNIST':
-        dataset['train'] = datasets.EMNIST(root=root, split='train', subset=subset,
-                                           transform=datasets.Compose([transforms.ToTensor()]))
-        dataset['test'] = datasets.EMNIST(root=root, split='test', subset=subset,
-                                          transform=datasets.Compose([transforms.ToTensor()]))
-        cfg['transform'] = {
-            'train': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]),
-            'test': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-        }
-    elif data_name in ['CIFAR10', 'CIFAR100']:
-        dataset['train'] = eval('datasets.{}(root=root, split=\'train\', subset=subset,'
-                                'transform=datasets.Compose([''transforms.ToTensor()]))'.format(data_name))
-        dataset['test'] = eval('datasets.{}(root=root, split=\'test\', subset=subset,'
-                               'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
-        cfg['transform'] = {
-            'train': datasets.Compose(
-                [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
-                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-            'test': datasets.Compose(
-                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        }
+    if data_name == 'MNIST':
+        dataset['train'] = datasets.MNIST(root=root, split='train', subset=subset, transform=datasets.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]))
+        dataset['test'] = datasets.MNIST(root=root, split='test', subset=subset, transform=datasets.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]))
+    elif data_name == 'CIFAR10':
+        dataset['train'] = datasets.CIFAR10(root=root, split='train', subset=subset, transform=datasets.Compose(
+            [transforms.RandomCrop(32, padding=4),
+             transforms.RandomHorizontalFlip(),
+             transforms.ToTensor(),
+             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
+        dataset['test'] = datasets.CIFAR10(root=root, split='train', subset=subset, transform=datasets.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
     elif data_name in ['ImageNet']:
-        dataset['train'] = eval('datasets.{}(root=root, split=\'train\', subset=subset, size=128,'
-                                'transform=datasets.Compose([''transforms.ToTensor()]))'.format(data_name))
-        dataset['test'] = eval('datasets.{}(root=root, split=\'test\', subset=subset, size=128,'
-                               'transform=datasets.Compose([transforms.ToTensor()]))'.format(data_name))
-        cfg['transform'] = {
-            'train': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
-            'test': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-        }
-    elif data_name == 'Omniglot':
-        dataset['train'] = datasets.Omniglot(root=root, split='train', subset=subset,
-                                             transform=datasets.Compose([transforms.ToTensor()]))
-        dataset['test'] = datasets.Omniglot(root=root, split='test', subset=subset,
-                                            transform=datasets.Compose([transforms.ToTensor()]))
-        cfg['transform'] = {
-            'train': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]),
-            'test': datasets.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-        }
+        dataset['train'] = datasets.ImageNet(root=root, split='train', subset=subset, size='base',
+                                             transform=datasets.Compose([
+                                                 transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(),
+                                                 transforms.ToTensor(),
+                                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))]))
+        dataset['test'] = datasets.ImageNet(root=root, split='test', subset=subset, size='base',
+                                            transform=datasets.Compose(
+                                                [transforms.Resize(256), transforms.CenterCrop(224),
+                                                 transforms.ToTensor(),
+                                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))]))
+    elif data_name == 'Hymenoptera':
+        dataset['train'] = datasets.ImageFolder(root=root, split='train', subset=subset, transform=datasets.Compose(
+            [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
+             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]))
+        dataset['test'] = datasets.ImageFolder(root=root, split='train', subset=subset, transform=datasets.Compose(
+            [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
+             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]))
     else:
         raise ValueError('Not valid dataset name')
-    dataset['train'].transform = cfg['transform']['train']
-    dataset['test'].transform = cfg['transform']['test']
     print('data ready')
     return dataset
+
 
 
 def input_collate(batch):

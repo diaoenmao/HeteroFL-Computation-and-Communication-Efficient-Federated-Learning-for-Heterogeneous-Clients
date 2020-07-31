@@ -1,13 +1,13 @@
 ---
 # control
 control:
-  optimizer_name: 'Adam'
+  optimizer_name: 'SGD'
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'iid'
-  model_split_mode: 'abcde'
+  model_split_mode: 'a1-b1'
 # data
-data_name: CIFAR10
+data_name: MNIST
 subset: label
 batch_size:
   train: 128

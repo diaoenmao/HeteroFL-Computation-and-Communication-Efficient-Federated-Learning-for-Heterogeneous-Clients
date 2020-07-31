@@ -14,7 +14,7 @@ def Accuracy(output, target, topk=1):
 class Metric(object):
     def __init__(self):
         self.metric = {'Loss': (lambda input, output: output['loss'].item()),
-                       'Accuracy': (lambda input, output: recur(Accuracy, output['label'], input['label']))}
+                       'Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label']))}
 
     def evaluate(self, metric_names, input, output):
         evaluation = {}
