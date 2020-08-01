@@ -22,7 +22,7 @@ def fetch_dataset(data_name, subset):
              transforms.RandomHorizontalFlip(),
              transforms.ToTensor(),
              transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
-        dataset['test'] = datasets.CIFAR10(root=root, split='train', subset=subset, transform=datasets.Compose(
+        dataset['test'] = datasets.CIFAR10(root=root, split='test', subset=subset, transform=datasets.Compose(
             [transforms.ToTensor(),
              transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
     elif data_name in ['ImageNet']:
@@ -36,13 +36,6 @@ def fetch_dataset(data_name, subset):
                                                 [transforms.Resize(256), transforms.CenterCrop(224),
                                                  transforms.ToTensor(),
                                                  transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))]))
-    elif data_name == 'Hymenoptera':
-        dataset['train'] = datasets.ImageFolder(root=root, split='train', subset=subset, transform=datasets.Compose(
-            [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ToTensor(),
-             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]))
-        dataset['test'] = datasets.ImageFolder(root=root, split='train', subset=subset, transform=datasets.Compose(
-            [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
-             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]))
     else:
         raise ValueError('Not valid dataset name')
     print('data ready')

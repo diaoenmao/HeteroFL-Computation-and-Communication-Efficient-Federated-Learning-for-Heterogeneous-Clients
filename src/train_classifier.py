@@ -49,7 +49,7 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
+    model = eval('models.{}(cfg["rate"][0]).to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     if cfg['resume_mode'] == 1:
@@ -138,7 +138,6 @@ def test(data_loader, model, logger, epoch):
         logger.append(info, 'test', mean=False)
         logger.write('test', cfg['metric_name']['test'])
     return
-
 
 
 if __name__ == "__main__":
