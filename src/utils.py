@@ -151,7 +151,7 @@ def process_control():
             raise ValueError('Not valid dataset')
     else:
         cfg['num_epochs'] = 300
-        cfg['batch_size'] = {'train': 128, 'test': 256}
+        cfg['batch_size'] = {'train': 128, 'test': 512}
         if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
             cfg['data_shape'] = [1, 28, 28]
         elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:

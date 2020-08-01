@@ -18,9 +18,9 @@ class Block(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Block, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_planes, track_running_stats=False)
+        self.bn1 = nn.InstanceNorm2d(in_planes, affine=True)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes, track_running_stats=False)
+        self.bn2 = nn.InstanceNorm2d(planes, affine=True)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.scaler = Scaler(rate)
 
@@ -41,11 +41,11 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Bottleneck, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_planes, track_running_stats=False)
+        self.bn1 = nn.InstanceNorm2d(in_planes, affine=True)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes, track_running_stats=False)
+        self.bn2 = nn.InstanceNorm2d(planes, affine=True)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(planes, track_running_stats=False)
+        self.bn3 = nn.InstanceNorm2d(planes, affine=True)
         self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
         self.scaler = Scaler(rate)
 
