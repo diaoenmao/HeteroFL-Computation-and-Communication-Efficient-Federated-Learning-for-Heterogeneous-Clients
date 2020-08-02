@@ -28,8 +28,8 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['pivot_metric'] = 'Loss'
-cfg['pivot'] = float('inf')
+cfg['pivot_metric'] = 'Accuracy'
+cfg['pivot'] = -float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
 
 
@@ -90,7 +90,7 @@ def runExperiment():
             'model_dict': model_state_dict, 'optimizer_dict': optimizer.state_dict(),
             'scheduler_dict': scheduler.state_dict(), 'logger': logger}
         save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
-        if cfg['pivot'] > logger.tracker['test/{}'.format(cfg['pivot_metric'])]:
+        if cfg['pivot'] < logger.tracker['test/{}'.format(cfg['pivot_metric'])]:
             cfg['pivot'] = logger.tracker['test/{}'.format(cfg['pivot_metric'])]
             shutil.copy('./output/model/{}_checkpoint.pt'.format(cfg['model_tag']),
                         './output/model/{}_best.pt'.format(cfg['model_tag']))
