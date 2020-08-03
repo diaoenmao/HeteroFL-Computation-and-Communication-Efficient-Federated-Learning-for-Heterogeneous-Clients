@@ -25,7 +25,7 @@ def fetch_dataset(data_name, subset):
         dataset['test'] = datasets.CIFAR10(root=root, split='test', subset=subset, transform=datasets.Compose(
             [transforms.ToTensor(),
              transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
-    elif data_name in ['ImageNet']:
+    elif data_name == 'ImageNet':
         dataset['train'] = datasets.ImageNet(root=root, split='train', subset=subset, size='base',
                                              transform=datasets.Compose([
                                                  transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(),
@@ -40,7 +40,6 @@ def fetch_dataset(data_name, subset):
         raise ValueError('Not valid dataset name')
     print('data ready')
     return dataset
-
 
 
 def input_collate(batch):
