@@ -89,7 +89,7 @@ class Federation:
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
             for m in range(len(user_idx)):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
                             local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(idx[m][k])])
@@ -97,10 +97,8 @@ class Federation:
                             local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
                     else:
                         local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
-                elif parameter_type == 'num_batches_tracked':
-                    local_parameters[m][k] = copy.deepcopy(v)
                 else:
-                    raise ValueError('Not valid parameter type')
+                    local_parameters[m][k] = copy.deepcopy(v)
         return local_parameters, idx
 
     def combine(self, local_parameters, idx):
@@ -110,7 +108,7 @@ class Federation:
             count[k] = v.new_zeros(v.size(), dtype=torch.float32)
             tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(len(local_parameters)):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
                             tmp_v[torch.meshgrid(idx[m][k])] += local_parameters[m][k]
@@ -121,11 +119,9 @@ class Federation:
                     else:
                         tmp_v[idx[m][k]] += local_parameters[m][k]
                         count[k][idx[m][k]] += 1
-                elif parameter_type == 'num_batches_tracked':
+                else:
                     tmp_v += local_parameters[m][k]
                     count[k] += 1
-                else:
-                    raise ValueError('Not valid parameter type')
             tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
             v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
         return

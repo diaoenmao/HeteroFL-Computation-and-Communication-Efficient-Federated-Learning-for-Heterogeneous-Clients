@@ -48,11 +48,11 @@ def main():
     extreme = []
     for i in range(1, 5):
         for e in exterior:
-            extreme += ['{}{}-'.format(pivot, i)+'{}{}'.format(e, 10-i)]
+            extreme += ['{}{}-'.format(pivot, i) + '{}{}'.format(e, 10 - i)]
     if fed:
-        control_name = [['SGD'], ['100'], ['0.1'], ['iid'], model_split + extreme]
+        control_name = [['SGD', 'Adam'], ['100'], ['0.1'], ['iid'], model_split + extreme]
     else:
-        control_name = [['SGD'], ['1'], ['1'], ['none'], model_split_mode]
+        control_name = [['SGD', 'Adam'], ['1'], ['1'], ['none'], model_split_mode]
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names

@@ -48,7 +48,7 @@ def runExperiment():
     load_tag = 'best'
     if cfg['data_split_mode'] != 'none':
         model = eval('models.{}().to(cfg["device"]).to(cfg["device"])'.format(cfg['model_name']))
-        last_epoch, _, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
+        last_epoch, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
     else:
         model = eval('models.{}(cfg["rate"][0]).to(cfg["device"]).to(cfg["device"])'.format(cfg['model_name']))
 

@@ -55,26 +55,24 @@ def runExperiment():
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
+    federation = Federation(global_parameters, cfg['rate'])
     if cfg['resume_mode'] == 1:
-        last_epoch, data_split, federation, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
+        last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
                                                                                          optimizer, scheduler)
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
-        _, data_split, federation, model, _, _, _ = resume(model, cfg['model_tag'])
+        _, data_split, model, _, _, _ = resume(model, cfg['model_tag'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     else:
         last_epoch = 1
         data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
-        federation = Federation(global_parameters, cfg['rate'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     if data_split is None:
         data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
-    if federation is None:
-        federation = Federation(global_parameters, cfg['rate'])
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
         train(dataset['train'], data_split, federation, model, optimizer, logger, epoch)

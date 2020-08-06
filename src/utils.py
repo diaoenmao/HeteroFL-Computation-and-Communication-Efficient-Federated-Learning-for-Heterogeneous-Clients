@@ -251,7 +251,6 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
             last_epoch = checkpoint['epoch']
             data_split = checkpoint['data_split']
-            federation = checkpoint['federation']
             model.load_state_dict(checkpoint['model_dict'])
             if optimizer is not None:
                 optimizer.load_state_dict(checkpoint['optimizer_dict'])
@@ -266,10 +265,9 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
             from logger import Logger
             last_epoch = 1
             data_split = None
-            federation = None
             logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
             logger = Logger(logger_path)
-        return last_epoch, data_split, federation, model, optimizer, scheduler, logger
+        return last_epoch, data_split, model, optimizer, scheduler, logger
     else:
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
