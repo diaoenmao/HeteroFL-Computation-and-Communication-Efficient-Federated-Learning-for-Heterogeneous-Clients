@@ -58,7 +58,7 @@ def runExperiment():
     federation = Federation(global_parameters, cfg['rate'])
     if cfg['resume_mode'] == 1:
         last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
-                                                                                         optimizer, scheduler)
+                                                                             optimizer, scheduler)
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
         _, data_split, model, _, _, _ = resume(model, cfg['model_tag'])
@@ -103,15 +103,15 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
     local_parameters, idx = federation.distribute(user_idx)
+    start_time = time.time()
     for m in range(num_active_users):
-        start_time = time.time()
         local = Local(dataset, data_split[user_idx[m]])
         local_model = eval('models.{}(cfg["rate"][user_idx[m]]).to(cfg["device"])'.format(cfg['model_name']))
         local_model.load_state_dict(local_parameters[m])
         local.train(local_model, optimizer.param_groups[0]['lr'], logger)
         local_parameters[m] = copy.deepcopy(local_model.state_dict())
         if m % int((num_active_users * cfg['log_interval']) + 1) == 0:
-            local_time = time.time() - start_time
+            local_time = (time.time() - start_time) / (m + 1)
             lr = optimizer.param_groups[0]['lr']
             epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
             exp_finished_time = epoch_finished_time + datetime.timedelta(

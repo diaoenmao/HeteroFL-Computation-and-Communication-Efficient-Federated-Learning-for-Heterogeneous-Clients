@@ -10,11 +10,18 @@ result_path = './output/result'
 vis_path = './output/vis'
 num_experiments = 1
 exp = [str(x) for x in list(range(num_experiments))]
-model_split_mode = ['a', 'b', 'c', 'd', 'e']
+model_split_mode = ['a1', 'b1', 'c1', 'd1', 'e1']
 model_split = []
 for i in range(1, len(model_split_mode) + 1):
-    model_split_i = [''.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
+    model_split_i = ['-'.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
     model_split.extend(model_split_i)
+pivot = 'a'
+exterior = ['b', 'c', 'd', 'e']
+extreme = []
+for i in range(1, 5):
+    for e in exterior:
+        extreme += ['{}{}-'.format(pivot, i) + '{}{}'.format(e, 10 - i)]
+model_split = model_split + extreme
 model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
 model_split_rate_key = list(model_split_rate.keys())
 model_color = {model_split_rate_key[i]: i for i in range(len(model_split_rate_key))}
@@ -117,10 +124,13 @@ def vis_result(fig, controls, processed_result, metrics):
 
 
 def control_name_to_rate(control_name):
+    frac = 0
     rate = 0
-    for c in control_name:
-        rate += model_split_rate[c] ** 2
-    rate /= len(control_name)
+    control_name_list = control_name.split('-')
+    for control_name in control_name_list:
+        frac += int(control_name[1])
+        rate += model_split_rate[control_name[0]] ** 2 * int(control_name[1])
+    rate /= frac
     return rate
 
 

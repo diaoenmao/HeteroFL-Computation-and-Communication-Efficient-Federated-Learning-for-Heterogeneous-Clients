@@ -94,8 +94,8 @@ def runExperiment():
 def train(data_loader, model, optimizer, logger, epoch):
     metric = Metric()
     model.train(True)
+    start_time = time.time()
     for i, input in enumerate(data_loader):
-        start_time = time.time()
         input = collate(input)
         input_size = input['img'].size(0)
         input = to_device(input, cfg['device'])
@@ -108,7 +108,7 @@ def train(data_loader, model, optimizer, logger, epoch):
         evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
         logger.append(evaluation, 'train', n=input_size)
         if i % int((len(data_loader) * cfg['log_interval']) + 1) == 0:
-            batch_time = time.time() - start_time
+            batch_time = (time.time() - start_time) / (i + 1)
             lr = optimizer.param_groups[0]['lr']
             epoch_finished_time = datetime.timedelta(seconds=round(batch_time * (len(data_loader) - i - 1)))
             exp_finished_time = epoch_finished_time + datetime.timedelta(

@@ -115,7 +115,7 @@ def process_control():
         cfg['lr'] = 3e-4
         cfg['betas'] = (0.9, 0.999)
         cfg['weight_decay'] = 5e-4
-        cfg['scheduler_name'] = 'ReduceLROnPlateau'
+        cfg['scheduler_name'] = 'None'
         cfg['factor'] = 0.5
         cfg['min_lr'] = 1e-5
     else:
