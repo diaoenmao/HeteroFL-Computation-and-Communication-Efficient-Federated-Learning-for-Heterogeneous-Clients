@@ -57,8 +57,8 @@ def runExperiment():
     global_parameters = model.state_dict()
     federation = Federation(global_parameters, cfg['rate'])
     if cfg['resume_mode'] == 1:
-        last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
-                                                                             optimizer, scheduler)
+        last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer,
+                                                                             scheduler)
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
         _, data_split, model, _, _, _ = resume(model, cfg['model_tag'])
@@ -100,19 +100,14 @@ def runExperiment():
 def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
     global_model.load_state_dict(federation.global_parameters)
     global_model.train(True)
-    num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
-    user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters, idx = federation.distribute(user_idx)
+    local, local_parameters, user_idx, param_idx = make_local(dataset, data_split, federation)
+    num_active_users = len(local)
+    lr = optimizer.param_groups[0]['lr']
     start_time = time.time()
     for m in range(num_active_users):
-        local = Local(dataset, data_split[user_idx[m]])
-        local_model = eval('models.{}(cfg["rate"][user_idx[m]]).to(cfg["device"])'.format(cfg['model_name']))
-        local_model.load_state_dict(local_parameters[m])
-        local.train(local_model, optimizer.param_groups[0]['lr'], logger)
-        local_parameters[m] = copy.deepcopy(local_model.state_dict())
+        local_parameters[m] = copy.deepcopy(local[m].train(local_parameters[m], lr, logger))
         if m % int((num_active_users * cfg['log_interval']) + 1) == 0:
             local_time = (time.time() - start_time) / (m + 1)
-            lr = optimizer.param_groups[0]['lr']
             epoch_finished_time = datetime.timedelta(seconds=local_time * (num_active_users - m - 1))
             exp_finished_time = epoch_finished_time + datetime.timedelta(
                 seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
@@ -124,7 +119,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
             logger.write('train', cfg['metric_name']['train'])
-    federation.combine(local_parameters, idx)
+    federation.combine(local_parameters, param_idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 
@@ -148,12 +143,27 @@ def test(data_loader, model, logger, epoch):
     return
 
 
-class Local:
-    def __init__(self, dataset, idx):
-        self.data_loader = make_data_loader({'train': SplitDataset(dataset, idx)})['train']
+def make_local(dataset, data_split, federation):
+    num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
+    user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
+    local_parameters, param_idx = federation.distribute(user_idx)
+    local = [None for _ in range(num_active_users)]
+    for m in range(num_active_users):
+        rate_m = cfg['rate'][user_idx[m]]
+        data_loader_m = make_data_loader({'train': SplitDataset(dataset, data_split[user_idx[m]])})['train']
+        local[m] = Local(rate_m, data_loader_m)
+    return local, local_parameters, user_idx, param_idx
 
-    def train(self, model, lr, logger):
+
+class Local:
+    def __init__(self, rate, data_loader):
+        self.rate = rate
+        self.data_loader = data_loader
+
+    def train(self, local_parameters, lr, logger):
         metric = Metric()
+        model = eval('models.{}(self.rate).to(cfg["device"])'.format(cfg['model_name']))
+        model.load_state_dict(local_parameters)
         model.train()
         optimizer = make_optimizer(model, lr)
         for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
@@ -168,7 +178,8 @@ class Local:
                 optimizer.step()
                 evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
                 logger.append(evaluation, 'train', n=input_size)
-        return
+        local_parameters = model.state_dict()
+        return local_parameters
 
 
 if __name__ == "__main__":

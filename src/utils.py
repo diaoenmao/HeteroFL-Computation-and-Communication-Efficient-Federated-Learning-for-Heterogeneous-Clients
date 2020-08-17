@@ -104,12 +104,20 @@ def process_dataset(dataset):
 
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
+    if cfg['data_name'] in ['MNIST']:
+        cfg['data_shape'] = [1, 28, 28]
+    elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
+        cfg['data_shape'] = [3, 32, 32]
+    elif cfg['data_name'] in ['ImageNet']:
+        cfg['data_shape'] = [3, 224, 224]
+    else:
+        raise ValueError('Not valid dataset')
     if cfg['optimizer_name'] == 'SGD':
-        cfg['lr'] = 1e-1
+        cfg['lr'] = 1e-2
         cfg['momentum'] = 0.9
         cfg['weight_decay'] = 5e-4
         cfg['scheduler_name'] = 'MultiStepLR'
-        cfg['milestones'] = [100, 200]
+        cfg['milestones'] = [100]
         cfg['factor'] = 0.1
     elif cfg['optimizer_name'] == 'Adam':
         cfg['lr'] = 3e-4
@@ -135,31 +143,14 @@ def process_control():
     for i in range(len(rate)):
         cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
     cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
-    cfg['mlp'] = {'hidden_size': [512, 256, 128]}
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
     if cfg['data_split_mode'] != 'none':
-        cfg['num_epochs'] = {'global': 300, 'local': 5}
-        cfg['batch_size'] = {'train': 10, 'test': 256}
-        if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
-            cfg['data_shape'] = [1, 28, 28]
-        elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
-            cfg['data_shape'] = [3, 32, 32]
-        elif cfg['data_name'] in ['ImageNet']:
-            cfg['data_shape'] = [3, 224, 224]
-        else:
-            raise ValueError('Not valid dataset')
+        cfg['num_epochs'] = {'global': 200, 'local': 5}
+        cfg['batch_size'] = {'train': 10, 'test': 512}
     else:
-        cfg['num_epochs'] = 300
+        cfg['num_epochs'] = 200
         cfg['batch_size'] = {'train': 128, 'test': 512}
-        if cfg['data_name'] in ['MNIST', 'FashionMNIST', 'Omniglot']:
-            cfg['data_shape'] = [1, 28, 28]
-        elif cfg['data_name'] in ['SVHN', 'CIFAR10', 'CIFAR100']:
-            cfg['data_shape'] = [3, 32, 32]
-        elif cfg['data_name'] in ['ImageNet']:
-            cfg['data_shape'] = [3, 224, 224]
-        else:
-            raise ValueError('Not valid dataset')
     return
 
 

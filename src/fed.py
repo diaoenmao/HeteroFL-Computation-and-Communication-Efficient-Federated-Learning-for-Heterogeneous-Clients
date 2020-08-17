@@ -84,7 +84,7 @@ class Federation:
         return idx
 
     def distribute(self, user_idx):
-        idx = self.split_model(user_idx)
+        param_idx = self.split_model(user_idx)
         local_parameters = [OrderedDict() for _ in range(len(user_idx))]
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
@@ -92,16 +92,16 @@ class Federation:
                 if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
-                            local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(idx[m][k])])
+                            local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(param_idx[m][k])])
                         else:
-                            local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                            local_parameters[m][k] = copy.deepcopy(v[param_idx[m][k]])
                     else:
-                        local_parameters[m][k] = copy.deepcopy(v[idx[m][k]])
+                        local_parameters[m][k] = copy.deepcopy(v[param_idx[m][k]])
                 else:
                     local_parameters[m][k] = copy.deepcopy(v)
-        return local_parameters, idx
+        return local_parameters, param_idx
 
-    def combine(self, local_parameters, idx):
+    def combine(self, local_parameters, param_idx):
         count = OrderedDict()
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
@@ -111,14 +111,14 @@ class Federation:
                 if parameter_type in ['weight', 'bias']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
-                            tmp_v[torch.meshgrid(idx[m][k])] += local_parameters[m][k]
-                            count[k][torch.meshgrid(idx[m][k])] += 1
+                            tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k]
+                            count[k][torch.meshgrid(param_idx[m][k])] += 1
                         else:
-                            tmp_v[idx[m][k]] += local_parameters[m][k]
-                            count[k][idx[m][k]] += 1
+                            tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                            count[k][param_idx[m][k]] += 1
                     else:
-                        tmp_v[idx[m][k]] += local_parameters[m][k]
-                        count[k][idx[m][k]] += 1
+                        tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                        count[k][param_idx[m][k]] += 1
                 else:
                     tmp_v += local_parameters[m][k]
                     count[k] += 1

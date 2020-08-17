@@ -21,14 +21,14 @@ class Logger():
             if self.writer is not None:
                 self.writer.close()
                 self.writer = None
+            for name in self.mean:
+                self.history[name].append(self.mean[name])
         return
 
     def reset(self):
         self.tracker = defaultdict(int)
         self.counter = defaultdict(int)
         self.mean = defaultdict(int)
-        for name in self.mean:
-            self.history[name].append(self.mean[name])
         return
 
     def append(self, result, tag, n=1, mean=True):
@@ -46,7 +46,6 @@ class Logger():
                         self.mean[name][i] = ((self.counter[name] - n) * self.mean[name][i] + n * result[k][i]) \
                                              / self.counter[name]
                 else:
-                    print(result[k])
                     raise ValueError('Not valid data type')
         return
 

@@ -8,7 +8,7 @@ from modules import Scaler
 
 
 class Conv(nn.Module):
-    def __init__(self, data_shape, hidden_size, classes_size, rate):
+    def __init__(self, data_shape, hidden_size, classes_size, rate=1):
         super().__init__()
         blocks = [nn.Conv2d(data_shape[0], hidden_size[0], 3, 1, 1),
                   nn.InstanceNorm2d(hidden_size[0], affine=True),
@@ -40,6 +40,9 @@ def conv(rate=1):
     hidden_size = [int(np.ceil(rate * x)) for x in cfg['conv']['hidden_size']]
     classes_size = cfg['classes_size']
     cfg['model'] = {}
-    model = Conv(data_shape, hidden_size, classes_size, rate)
+    if cfg['data_split_mode'] != 'none':
+        model = Conv(data_shape, hidden_size, classes_size, rate)
+    else:
+        model = Conv(data_shape, hidden_size, classes_size)
     model.apply(init_param)
     return model

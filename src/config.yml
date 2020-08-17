@@ -5,7 +5,7 @@ control:
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'iid'
-  model_split_mode: 'a1-b1'
+  model_split_mode: 'e1'
 # data
 data_name: MNIST
 subset: label
