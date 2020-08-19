@@ -65,7 +65,7 @@ def main():
                 '--world_size {} --num_experiments {} --resume_mode {} --control_name {}&\n'.format(
             gpu_ids[k % len(gpu_ids)], *controls[i])
         if k % round == round - 1:
-            s = s[:-2] + '\n'
+            s = s[:-2] + '\nwait\n'
         k = k + 1
     print(s)
     run_file = open('./{}.sh'.format(filename), 'w')

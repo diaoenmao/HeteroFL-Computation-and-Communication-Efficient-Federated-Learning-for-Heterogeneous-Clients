@@ -18,9 +18,9 @@ class Block(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Block, self).__init__()
-        self.bn1 = nn.InstanceNorm2d(in_planes, affine=True)
+        self.n1 = nn.InstanceNorm2d(in_planes, affine=True)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn2 = nn.InstanceNorm2d(planes, affine=True)
+        self.n2 = nn.InstanceNorm2d(planes, affine=True)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.scaler = Scaler(rate)
 
@@ -28,10 +28,10 @@ class Block(nn.Module):
             self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = self.scaler(F.relu(self.bn1(x)))
+        out = self.scaler(F.relu(self.n1(x)))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
-        out = self.conv2(self.scaler(F.relu(self.bn2(out))))
+        out = self.conv2(self.scaler(F.relu(self.n2(out))))
         out += shortcut
         return out
 
@@ -41,11 +41,11 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Bottleneck, self).__init__()
-        self.bn1 = nn.InstanceNorm2d(in_planes, affine=True)
+        self.n1 = nn.InstanceNorm2d(in_planes, affine=True)
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn2 = nn.InstanceNorm2d(planes, affine=True)
+        self.n2 = nn.InstanceNorm2d(planes, affine=True)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.bn3 = nn.InstanceNorm2d(planes, affine=True)
+        self.n3 = nn.InstanceNorm2d(planes, affine=True)
         self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
         self.scaler = Scaler(rate)
 
@@ -53,11 +53,11 @@ class Bottleneck(nn.Module):
             self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = self.scaler(F.relu(self.bn1(x)))
+        out = F.relu(self.n1(self.scaler(x)))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
-        out = self.conv2(self.scaler(F.relu(self.bn2(out))))
-        out = self.conv3(self.scaler(F.relu(self.bn3(out))))
+        out = self.conv2(F.relu(self.n2(self.scaler(out))))
+        out = self.conv3(F.relu(self.n3(self.scaler(out))))
         out += shortcut
         return out
 

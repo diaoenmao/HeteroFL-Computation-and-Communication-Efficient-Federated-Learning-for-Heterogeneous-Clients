@@ -147,7 +147,7 @@ def process_control():
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
     if cfg['data_split_mode'] != 'none':
         cfg['num_epochs'] = {'global': 200, 'local': 5}
-        cfg['batch_size'] = {'train': 10, 'test': 512}
+        cfg['batch_size'] = {'train': 10, 'test': 64}
     else:
         cfg['num_epochs'] = 200
         cfg['batch_size'] = {'train': 128, 'test': 512}

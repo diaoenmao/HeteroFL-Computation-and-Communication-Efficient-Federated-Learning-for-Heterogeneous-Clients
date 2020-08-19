@@ -17,7 +17,7 @@ class Conv(nn.Module):
                   nn.MaxPool2d(2)]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Conv2d(hidden_size[i], hidden_size[i + 1], 3, 1, 1),
-                           nn.InstanceNorm2d(hidden_size[i + 1], affine=True),
+                           nn.InstanceNorm2d(hidden_size[i + 1], affine=False),
                            nn.ReLU(inplace=True),
                            Scaler(rate),
                            nn.MaxPool2d(2)])
