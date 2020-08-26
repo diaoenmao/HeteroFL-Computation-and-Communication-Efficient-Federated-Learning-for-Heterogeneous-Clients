@@ -18,7 +18,7 @@ class Federation:
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
-                    if parameter_type in ['weight', 'bias']:
+                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 input_size = v.size(1)
@@ -40,14 +40,14 @@ class Federation:
                             input_idx_i_m = idx_i[m]
                             idx[m][k] = input_idx_i_m
                     else:
-                        raise ValueError('Not valid parameter type')
+                        pass
         elif 'resnet' in cfg['model_name']:
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
-                    if parameter_type in ['weight', 'bias']:
+                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 input_size = v.size(1)
@@ -78,7 +78,7 @@ class Federation:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
                     else:
-                        raise ValueError('Not valid parameter type')
+                        pass
         else:
             raise ValueError('Not valid model name')
         return idx
@@ -89,7 +89,7 @@ class Federation:
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
             for m in range(len(user_idx)):
-                if parameter_type in ['weight', 'bias']:
+                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
                             local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(param_idx[m][k])])
@@ -108,7 +108,7 @@ class Federation:
             count[k] = v.new_zeros(v.size(), dtype=torch.float32)
             tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
             for m in range(len(local_parameters)):
-                if parameter_type in ['weight', 'bias']:
+                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
                     if parameter_type == 'weight':
                         if v.dim() > 1:
                             tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k]

@@ -32,27 +32,28 @@ def main():
         script_name = [['{}_{}_fed.py'.format(run, file)]]
     else:
         script_name = [['{}_{}.py'.format(run, file)]]
-    data_names = [['MNIST', 'CIFAR10']]
+    data_names = [['MNIST']]
     model_names = [[model]]
     init_seeds = [list(range(0, num_experiments, experiment_step))]
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
     resume_mode = [[resume_mode]]
-    model_split_mode = ['a1', 'b1', 'c1', 'd1', 'e1']
-    model_split = []
-    for i in range(1, len(model_split_mode) + 1):
-        model_split_i = ['-'.join(list(x)) for x in itertools.combinations(model_split_mode, i)]
-        model_split.extend(model_split_i)
-    pivot = 'a'
-    exterior = ['b', 'c', 'd', 'e']
-    extreme = []
-    for i in range(1, 5):
-        for e in exterior:
-            extreme += ['{}{}-'.format(pivot, i) + '{}{}'.format(e, 10 - i)]
+    model_split_mode = ['a', 'b', 'c', 'd', 'e']
+    combination_mode = [x + '1' for x in model_split_mode]
+    combination = []
+    for i in range(1, len(combination_mode) + 1):
+        combination_mode_i = ['-'.join(list(x)) for x in itertools.combinations(combination_mode, i)]
+        combination.extend(combination_mode_i)
+    interp = []
+    for i in range(1, 10):
+        for j in range(len(model_split_mode)):
+            for k in range(j + 1, len(model_split_mode)):
+                interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
+    interp = interp
     if fed:
-        control_name = [['SGD', 'Adam'], ['100'], ['0.1'], ['iid'], model_split + extreme]
+        control_name = [['SGD'], ['100'], ['0.1'], ['iid'], combination + interp]
     else:
-        control_name = [['SGD', 'Adam'], ['1'], ['1'], ['none'], model_split_mode]
+        control_name = [['SGD'], ['1'], ['1'], ['none'], combination_mode]
     control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names

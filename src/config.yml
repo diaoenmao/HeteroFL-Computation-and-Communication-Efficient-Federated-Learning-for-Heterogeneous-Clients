@@ -5,7 +5,7 @@ control:
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'iid'
-  model_split_mode: 'e1'
+  model_split_mode: 'a1'
 # data
 data_name: MNIST
 subset: label
@@ -48,3 +48,4 @@ device: cuda
 world_size: 1
 resume_mode: 0
 # other
+save_format: png

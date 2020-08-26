@@ -104,30 +104,6 @@ def process_dataset(dataset):
 
 def process_control():
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
-    if cfg['data_name'] in ['MNIST']:
-        cfg['data_shape'] = [1, 28, 28]
-    elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
-        cfg['data_shape'] = [3, 32, 32]
-    elif cfg['data_name'] in ['ImageNet']:
-        cfg['data_shape'] = [3, 224, 224]
-    else:
-        raise ValueError('Not valid dataset')
-    if cfg['optimizer_name'] == 'SGD':
-        cfg['lr'] = 1e-2
-        cfg['momentum'] = 0.9
-        cfg['weight_decay'] = 5e-4
-        cfg['scheduler_name'] = 'MultiStepLR'
-        cfg['milestones'] = [100]
-        cfg['factor'] = 0.1
-    elif cfg['optimizer_name'] == 'Adam':
-        cfg['lr'] = 3e-4
-        cfg['betas'] = (0.9, 0.999)
-        cfg['weight_decay'] = 5e-4
-        cfg['scheduler_name'] = 'None'
-        cfg['factor'] = 0.5
-        cfg['min_lr'] = 1e-5
-    else:
-        raise ValueError('Not valid optimizer')
     cfg['num_users'] = int(cfg['control']['num_users'])
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
@@ -145,12 +121,58 @@ def process_control():
     cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
-    if cfg['data_split_mode'] != 'none':
-        cfg['num_epochs'] = {'global': 200, 'local': 5}
-        cfg['batch_size'] = {'train': 10, 'test': 64}
+    if cfg['data_name'] in ['MNIST']:
+        cfg['data_shape'] = [1, 28, 28]
+        if cfg['optimizer_name'] == 'SGD':
+            cfg['lr'] = 1e-2
+            cfg['momentum'] = 0.9
+            cfg['weight_decay'] = 5e-4
+            cfg['scheduler_name'] = 'MultiStepLR'
+            cfg['milestones'] = [100]
+            cfg['factor'] = 0.1
+        elif cfg['optimizer_name'] == 'Adam':
+            cfg['lr'] = 3e-4
+            cfg['betas'] = (0.9, 0.999)
+            cfg['weight_decay'] = 5e-4
+            cfg['scheduler_name'] = 'None'
+            cfg['factor'] = 0.5
+            cfg['min_lr'] = 1e-5
+        else:
+            raise ValueError('Not valid optimizer')
+        if cfg['data_split_mode'] != 'none':
+            cfg['num_epochs'] = {'global': 200, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+        else:
+            cfg['num_epochs'] = 200
+            cfg['batch_size'] = {'train': 128, 'test': 512}
+    elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
+        cfg['data_shape'] = [3, 32, 32]
+        if cfg['optimizer_name'] == 'SGD':
+            cfg['lr'] = 1e-2
+            cfg['momentum'] = 0.9
+            cfg['weight_decay'] = 5e-4
+            cfg['scheduler_name'] = 'MultiStepLR'
+            cfg['milestones'] = [200]
+            cfg['factor'] = 0.1
+        elif cfg['optimizer_name'] == 'Adam':
+            cfg['lr'] = 3e-4
+            cfg['betas'] = (0.9, 0.999)
+            cfg['weight_decay'] = 5e-4
+            cfg['scheduler_name'] = 'None'
+            cfg['factor'] = 0.5
+            cfg['min_lr'] = 1e-5
+        else:
+            raise ValueError('Not valid optimizer')
+        if cfg['data_split_mode'] != 'none':
+            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+        else:
+            cfg['num_epochs'] = 400
+            cfg['batch_size'] = {'train': 128, 'test': 512}
+    elif cfg['data_name'] in ['ImageNet']:
+        cfg['data_shape'] = [3, 224, 224]
     else:
-        cfg['num_epochs'] = 200
-        cfg['batch_size'] = {'train': 128, 'test': 512}
+        raise ValueError('Not valid dataset')
     return
 
 
