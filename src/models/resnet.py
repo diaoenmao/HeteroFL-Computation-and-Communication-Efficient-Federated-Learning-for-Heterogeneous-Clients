@@ -18,14 +18,14 @@ class Block(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Block, self).__init__()
-        self.n1 = nn.InstanceNorm2d(in_planes, affine=True)
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.n2 = nn.InstanceNorm2d(planes, affine=True)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.n1 = nn.BatchNorm2d(in_planes, track_running_stats=True, affine=True)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=True)
+        self.n2 = nn.BatchNorm2d(planes, track_running_stats=True, affine=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=True)
         self.scaler = Scaler(rate)
 
         if stride != 1 or in_planes != self.expansion * planes:
-            self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
+            self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=True)
 
     def forward(self, x):
         out = self.scaler(F.relu(self.n1(x)))
@@ -41,23 +41,23 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride, rate):
         super(Bottleneck, self).__init__()
-        self.n1 = nn.InstanceNorm2d(in_planes, affine=True)
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.n2 = nn.InstanceNorm2d(planes, affine=True)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-        self.n3 = nn.InstanceNorm2d(planes, affine=True)
-        self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=False)
+        self.n1 = nn.BatchNorm2d(in_planes, track_running_stats=True, affine=True)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=True)
+        self.n2 = nn.BatchNorm2d(planes, track_running_stats=True, affine=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=True)
+        self.n3 = nn.BatchNorm2d(planes, track_running_stats=True, affine=True)
+        self.conv3 = nn.Conv2d(planes, self.expansion * planes, kernel_size=1, bias=True)
         self.scaler = Scaler(rate)
 
         if stride != 1 or in_planes != self.expansion * planes:
-            self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
+            self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=True)
 
     def forward(self, x):
-        out = F.relu(self.n1(self.scaler(x)))
+        out = self.scaler(F.relu(self.n1(x)))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
-        out = self.conv2(F.relu(self.n2(self.scaler(out))))
-        out = self.conv3(F.relu(self.n3(self.scaler(out))))
+        out = self.conv2(self.scaler(F.relu(self.n2(out))))
+        out = self.conv3(self.scaler(F.relu(self.n3(out))))
         out += shortcut
         return out
 
@@ -66,11 +66,13 @@ class ResNet(nn.Module):
     def __init__(self, data_shape, hidden_size, block, num_blocks, num_classes, rate):
         super(ResNet, self).__init__()
         self.in_planes = hidden_size[0]
-        self.conv1 = nn.Conv2d(data_shape[0], hidden_size[0], kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(data_shape[0], hidden_size[0], kernel_size=3, stride=1, padding=1, bias=True)
         self.layer1 = self._make_layer(block, hidden_size[0], num_blocks[0], stride=1, rate=rate)
         self.layer2 = self._make_layer(block, hidden_size[1], num_blocks[1], stride=2, rate=rate)
         self.layer3 = self._make_layer(block, hidden_size[2], num_blocks[2], stride=2, rate=rate)
         self.layer4 = self._make_layer(block, hidden_size[3], num_blocks[3], stride=2, rate=rate)
+        self.n4 = nn.BatchNorm2d(hidden_size[3] * block.expansion, track_running_stats=True, affine=True)
+        self.scaler = Scaler(rate)
         self.linear = nn.Linear(hidden_size[3] * block.expansion, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride, rate):
@@ -89,6 +91,7 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
+        out = self.scaler(F.relu(self.n4(out)))
         out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
@@ -97,46 +100,46 @@ class ResNet(nn.Module):
         return output
 
 
-def resnet18(rate=1):
+def resnet18(model_rate=1, scaler_rate=1):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
-    hidden_size = [int(np.ceil(rate * x)) for x in cfg['resnet']['hidden_size']]
-    model = ResNet(data_shape, hidden_size, Block, [2, 2, 2, 2], classes_size, rate)
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    model = ResNet(data_shape, hidden_size, Block, [1, 1, 1, 2], classes_size, scaler_rate)
     model.apply(init_param)
     return model
 
 
-def resnet34(rate=1):
+def resnet34(model_rate=1, scaler_rate=1):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
-    hidden_size = [int(np.ceil(rate * x)) for x in cfg['resnet']['hidden_size']]
-    model = ResNet(data_shape, hidden_size, Block, [3, 4, 6, 3], classes_size, rate)
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    model = ResNet(data_shape, hidden_size, Block, [3, 4, 6, 3], classes_size, scaler_rate)
     model.apply(init_param)
     return model
 
 
-def resnet50(rate=1):
+def resnet50(model_rate=1, scaler_rate=1):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
-    hidden_size = [int(np.ceil(rate * x)) for x in cfg['resnet']['hidden_size']]
-    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 6, 3], classes_size, rate)
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 6, 3], classes_size, scaler_rate)
     model.apply(init_param)
     return model
 
 
-def resnet101(rate=1):
+def resnet101(model_rate=1, scaler_rate=1):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
-    hidden_size = [int(np.ceil(rate * x)) for x in cfg['resnet']['hidden_size']]
-    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 23, 3], classes_size, rate)
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 23, 3], classes_size, scaler_rate)
     model.apply(init_param)
     return model
 
 
-def resnet152(rate=1):
+def resnet152(model_rate=1, scaler_rate=1):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
-    hidden_size = [int(np.ceil(rate * x)) for x in cfg['resnet']['hidden_size']]
-    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 8, 36, 3], classes_size, rate)
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    model = ResNet(data_shape, hidden_size, Bottleneck, [3, 8, 36, 3], classes_size, scaler_rate)
     model.apply(init_param)
     return model

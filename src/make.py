@@ -49,12 +49,19 @@ def main():
         for j in range(len(model_split_mode)):
             for k in range(j + 1, len(model_split_mode)):
                 interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
-    interp = interp
-    if fed:
-        control_name = [['SGD'], ['100'], ['0.1'], ['iid'], combination + interp]
+    if fed == 0:
+        control_name = [[['SGD'], ['1'], ['1'], ['none'], model_split_mode]]
+    elif fed == 1:
+        control_name_combination = [['SGD'], ['100'], ['0.1'], ['iid'], ['a'], combination]
+        control_name_interp = [['SGD'], ['100'], ['0.1'], ['iid'], ['a'], interp]
+        control_name_full = [['SGD'], ['100'], ['0.1'], ['iid'], ['b_a1', 'c_a1', 'd_a1', 'e_a1']]
+        control_name = [control_name_combination, control_name_interp, control_name_full]
     else:
-        control_name = [['SGD'], ['1'], ['1'], ['none'], combination_mode]
-    control_names = [['_'.join(x) for x in itertools.product(*control_name)]]
+        raise ValueError('Not valid fed')
+    control_names = []
+    for i in range(len(control_name)):
+        control_names.extend(list('_'.join(x) for x in itertools.product(*control_name[i])))
+    control_names = [control_names]
     controls = script_name + data_names + model_names + init_seeds + world_size + num_experiments + resume_mode + \
                control_names
     controls = list(itertools.product(*controls))
@@ -68,6 +75,8 @@ def main():
         if k % round == round - 1:
             s = s[:-2] + '\nwait\n'
         k = k + 1
+    if s[-5:-1] != 'wait':
+        s = s + 'wait\n'
     print(s)
     run_file = open('./{}.sh'.format(filename), 'w')
     run_file.write(s)

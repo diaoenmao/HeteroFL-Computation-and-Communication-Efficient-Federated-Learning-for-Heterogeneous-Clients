@@ -51,7 +51,7 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}().to(cfg["device"])'.format(cfg['model_name']))
+    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
@@ -162,7 +162,8 @@ class Local:
 
     def train(self, local_parameters, lr, logger):
         metric = Metric()
-        model = eval('models.{}(self.rate).to(cfg["device"])'.format(cfg['model_name']))
+        model = eval('models.{}(model_rate=cfg["global_model_rate"] * self.rate, '
+                     'scaler_rate=self.rate).to(cfg["device"])'.format(cfg['model_name']))
         model.load_state_dict(local_parameters)
         model.train()
         optimizer = make_optimizer(model, lr)

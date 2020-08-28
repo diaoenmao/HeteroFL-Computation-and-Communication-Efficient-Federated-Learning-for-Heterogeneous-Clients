@@ -103,22 +103,25 @@ def process_dataset(dataset):
 
 
 def process_control():
+    cfg['model_split_rate'] = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
     cfg['optimizer_name'] = cfg['control']['optimizer_name']
     cfg['num_users'] = int(cfg['control']['num_users'])
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
-    cfg['model_split_mode'] = cfg['control']['model_split_mode']
-    model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
-    model_split_mode = cfg['model_split_mode'].split('-')
-    rate, proportion = [], []
-    for m in model_split_mode:
-        rate.append(model_split_rate[m[0]])
-        proportion.append(int(m[1:]))
-    num_users_proportion = cfg['num_users'] // sum(proportion)
-    cfg['rate'] = []
-    for i in range(len(rate)):
-        cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
-    cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
+    cfg['global_model_mode'] = cfg['control']['global_model_mode']
+    cfg['global_model_rate'] = cfg['model_split_rate'][cfg['global_model_mode']]
+    if 'model_split_mode' in cfg['control']:
+        cfg['model_split_mode'] = cfg['control']['model_split_mode']
+        model_split_mode = cfg['model_split_mode'].split('-')
+        rate, proportion = [], []
+        for m in model_split_mode:
+            rate.append(cfg['model_split_rate'][m[0]])
+            proportion.append(int(m[1:]))
+        num_users_proportion = cfg['num_users'] // sum(proportion)
+        cfg['rate'] = []
+        for i in range(len(rate)):
+            cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
+        cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
     if cfg['data_name'] in ['MNIST']:
@@ -128,23 +131,21 @@ def process_control():
             cfg['momentum'] = 0.9
             cfg['weight_decay'] = 5e-4
             cfg['scheduler_name'] = 'MultiStepLR'
-            cfg['milestones'] = [100]
             cfg['factor'] = 0.1
-        elif cfg['optimizer_name'] == 'Adam':
-            cfg['lr'] = 3e-4
-            cfg['betas'] = (0.9, 0.999)
-            cfg['weight_decay'] = 5e-4
-            cfg['scheduler_name'] = 'None'
-            cfg['factor'] = 0.5
-            cfg['min_lr'] = 1e-5
         else:
             raise ValueError('Not valid optimizer')
-        if cfg['data_split_mode'] != 'none':
+        if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 200, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['milestones'] = [100]
+        elif cfg['data_split_mode'] == 'non-iid':
+            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['milestones'] = [200]
         else:
             cfg['num_epochs'] = 200
             cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['milestones'] = [100]
     elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
         if cfg['optimizer_name'] == 'SGD':
@@ -154,21 +155,20 @@ def process_control():
             cfg['scheduler_name'] = 'MultiStepLR'
             cfg['milestones'] = [200]
             cfg['factor'] = 0.1
-        elif cfg['optimizer_name'] == 'Adam':
-            cfg['lr'] = 3e-4
-            cfg['betas'] = (0.9, 0.999)
-            cfg['weight_decay'] = 5e-4
-            cfg['scheduler_name'] = 'None'
-            cfg['factor'] = 0.5
-            cfg['min_lr'] = 1e-5
         else:
             raise ValueError('Not valid optimizer')
         if cfg['data_split_mode'] != 'none':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['milestones'] = [200]
+        elif cfg['data_split_mode'] == 'non-iid':
+            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['milestones'] = [200]
         else:
             cfg['num_epochs'] = 400
             cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['milestones'] = [200]
     elif cfg['data_name'] in ['ImageNet']:
         cfg['data_shape'] = [3, 224, 224]
     else:

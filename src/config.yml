@@ -5,6 +5,7 @@ control:
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'iid'
+  global_model_mode: 'b'
   model_split_mode: 'a1'
 # data
 data_name: MNIST
@@ -16,7 +17,7 @@ shuffle:
   train: True
   test: False
 num_workers: 0
-model_name: conv
+model_name: resnet18
 metric_name:
   train:
     - Loss

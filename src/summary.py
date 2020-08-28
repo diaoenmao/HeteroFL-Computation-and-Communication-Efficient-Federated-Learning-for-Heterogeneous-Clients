@@ -24,7 +24,7 @@ if args['control_name']:
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['batch_size'] = {'train': 2, 'test': 2}
-rate = 0.0625
+rate = 1
 
 def main():
     process_control()
