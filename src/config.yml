@@ -5,8 +5,9 @@ control:
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'iid'
-  global_model_mode: 'b'
-  model_split_mode: 'a1'
+  model_split_mode: 'fix'
+  global_model_mode: 'a'
+  fed_model_mode: 'a1-b1-c1-d1-e1'
 # data
 data_name: MNIST
 subset: label

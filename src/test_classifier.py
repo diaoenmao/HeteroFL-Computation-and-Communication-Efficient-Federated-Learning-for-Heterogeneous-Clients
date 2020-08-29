@@ -23,8 +23,8 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['batch_size'] = {'train': 16, 'test': 512}
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
+cfg['track'] = True
 
 
 def main():
@@ -39,6 +39,7 @@ def main():
 
 
 def runExperiment():
+    cfg['batch_size']['train'] = cfg['batch_size']['test']
     seed = int(cfg['model_tag'].split('_')[0])
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -47,20 +48,32 @@ def runExperiment():
     data_loader = make_data_loader(dataset)
     load_tag = 'best'
     if cfg['data_split_mode'] != 'none':
-        model = eval('models.{}().to(cfg["device"]).to(cfg["device"])'.format(cfg['model_name']))
-        last_epoch, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
+        model = eval('models.{}(cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
+                     .format(cfg['model_name']))
+        last_epoch, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
     else:
-        model = eval('models.{}(cfg["rate"][0]).to(cfg["device"]).to(cfg["device"])'.format(cfg['model_name']))
-
-        last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag)
+        model = eval('models.{}(cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
+                     .format(cfg['model_name']))
+        last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)
     logger.safe(True)
+    running(data_loader['train'], model)
     test(data_loader['test'], model, logger, last_epoch)
     logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
+    return
+
+
+def running(data_loader, model):
+    with torch.no_grad():
+        model.train(True)
+        for i, input in enumerate(data_loader):
+            input = collate(input)
+            input = to_device(input, cfg['device'])
+            model(input)
     return
 
 

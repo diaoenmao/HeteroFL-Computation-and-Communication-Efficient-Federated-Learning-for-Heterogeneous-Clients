@@ -31,7 +31,7 @@ cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['pivot_metric'] = 'Accuracy'
 cfg['pivot'] = -float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
-
+cfg['track'] = False
 
 def main():
     process_control()
@@ -114,7 +114,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
                              'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
                              'Learning rate: {}'.format(lr),
-                             'Rate: {}'.format(cfg['rate'][user_idx[m]]),
+                             'Rate: {}'.format(federation.scaler_rate[user_idx[m]]),
                              'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
@@ -149,7 +149,7 @@ def make_local(dataset, data_split, federation):
     local_parameters, param_idx = federation.distribute(user_idx)
     local = [None for _ in range(num_active_users)]
     for m in range(num_active_users):
-        rate_m = cfg['rate'][user_idx[m]]
+        rate_m = federation.scaler_rate[user_idx[m]]
         data_loader_m = make_data_loader({'train': SplitDataset(dataset, data_split[user_idx[m]])})['train']
         local[m] = Local(rate_m, data_loader_m)
     return local, local_parameters, user_idx, param_idx

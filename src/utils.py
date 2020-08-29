@@ -108,26 +108,36 @@ def process_control():
     cfg['num_users'] = int(cfg['control']['num_users'])
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
+    cfg['model_split_mode'] = cfg['control']['model_split_mode']
     cfg['global_model_mode'] = cfg['control']['global_model_mode']
     cfg['global_model_rate'] = cfg['model_split_rate'][cfg['global_model_mode']]
-    if 'model_split_mode' in cfg['control']:
-        cfg['model_split_mode'] = cfg['control']['model_split_mode']
-        model_split_mode = cfg['model_split_mode'].split('-')
-        rate, proportion = [], []
-        for m in model_split_mode:
-            rate.append(cfg['model_split_rate'][m[0]])
-            proportion.append(int(m[1:]))
-        num_users_proportion = cfg['num_users'] // sum(proportion)
-        cfg['rate'] = []
-        for i in range(len(rate)):
-            cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
-        cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
+    if 'fed_model_mode' in cfg['control']:
+        cfg['fed_model_mode'] = cfg['control']['fed_model_mode']
+        fed_model_mode = cfg['fed_model_mode'].split('-')
+        if cfg['model_split_mode'] == 'dynamic':
+            rate, proportion = [], []
+            for m in fed_model_mode:
+                rate.append(cfg['model_split_rate'][m[0]])
+                proportion.append(int(m[1:]))
+            cfg['rate'] = rate
+            cfg['proportion'] = (np.array(proportion) / sum(proportion)).tolist()
+        elif cfg['model_split_mode'] == 'fix':
+            rate, proportion = [], []
+            for m in fed_model_mode:
+                rate.append(cfg['model_split_rate'][m[0]])
+                proportion.append(int(m[1:]))
+            num_users_proportion = cfg['num_users'] // sum(proportion)
+            cfg['rate'] = []
+            for i in range(len(rate)):
+                cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
+            cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
+        else:
+            raise ValueError('Not valid model split mode')
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
         if cfg['optimizer_name'] == 'SGD':
-            cfg['lr'] = 1e-2
             cfg['momentum'] = 0.9
             cfg['weight_decay'] = 5e-4
             cfg['scheduler_name'] = 'MultiStepLR'
@@ -137,19 +147,21 @@ def process_control():
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 200, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['lr'] = 1e-2
             cfg['milestones'] = [100]
         elif cfg['data_split_mode'] == 'non-iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['lr'] = 1e-2
             cfg['milestones'] = [200]
         else:
             cfg['num_epochs'] = 200
             cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['lr'] = 1e-2
             cfg['milestones'] = [100]
     elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
         if cfg['optimizer_name'] == 'SGD':
-            cfg['lr'] = 1e-2
             cfg['momentum'] = 0.9
             cfg['weight_decay'] = 5e-4
             cfg['scheduler_name'] = 'MultiStepLR'
@@ -160,15 +172,18 @@ def process_control():
         if cfg['data_split_mode'] != 'none':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['milestones'] = [200]
+            cfg['lr'] = 1e-1
+            cfg['milestones'] = [150, 250]
         elif cfg['data_split_mode'] == 'non-iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['milestones'] = [200]
+            cfg['lr'] = 1e-1
+            cfg['milestones'] = [150, 250]
         else:
             cfg['num_epochs'] = 400
             cfg['batch_size'] = {'train': 128, 'test': 512}
-            cfg['milestones'] = [200]
+            cfg['lr'] = 1e-1
+            cfg['milestones'] = [150, 250]
     elif cfg['data_name'] in ['ImageNet']:
         cfg['data_shape'] = [3, 224, 224]
     else:
@@ -258,13 +273,13 @@ def make_scheduler(optimizer):
     return scheduler
 
 
-def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoint', verbose=True):
+def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoint', strict=True, verbose=True):
     if cfg['data_split_mode'] != 'none':
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
             last_epoch = checkpoint['epoch']
             data_split = checkpoint['data_split']
-            model.load_state_dict(checkpoint['model_dict'])
+            model.load_state_dict(checkpoint['model_dict'], strict=strict)
             if optimizer is not None:
                 optimizer.load_state_dict(checkpoint['optimizer_dict'])
             if scheduler is not None:
@@ -285,7 +300,7 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
             last_epoch = checkpoint['epoch']
-            model.load_state_dict(checkpoint['model_dict'])
+            model.load_state_dict(checkpoint['model_dict'], strict=strict)
             if optimizer is not None:
                 optimizer.load_state_dict(checkpoint['optimizer_dict'])
             if scheduler is not None:

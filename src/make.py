@@ -12,6 +12,7 @@ parser.add_argument('--round', default=4, type=int)
 parser.add_argument('--experiment_step', default=1, type=int)
 parser.add_argument('--num_experiments', default=1, type=int)
 parser.add_argument('--resume_mode', default=0, type=int)
+parser.add_argument('--data_split_mode', default='iid', type=str)
 args = vars(parser.parse_args())
 
 
@@ -26,13 +27,19 @@ def main():
     experiment_step = args['experiment_step']
     num_experiments = args['num_experiments']
     resume_mode = args['resume_mode']
+    data_split_mode = args['data_split_mode']
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpu, world_size))]
     filename = '{}_{}'.format(run, model)
     if run == 'train' and fed:
         script_name = [['{}_{}_fed.py'.format(run, file)]]
     else:
         script_name = [['{}_{}.py'.format(run, file)]]
-    data_names = [['MNIST']]
+    if model in ['conv']:
+        data_names = [['MNIST']]
+    elif model in ['resnet18']:
+        data_names = [['CIFAR10']]
+    else:
+        raise ValueError('Not valid model')
     model_names = [[model]]
     init_seeds = [list(range(0, num_experiments, experiment_step))]
     world_size = [[world_size]]
@@ -50,11 +57,13 @@ def main():
             for k in range(j + 1, len(model_split_mode)):
                 interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
     if fed == 0:
-        control_name = [[['SGD'], ['1'], ['1'], ['none'], model_split_mode]]
+        control_name = [[['SGD'], ['1'], ['1'], ['none'], ['fix'], model_split_mode]]
     elif fed == 1:
-        control_name_combination = [['SGD'], ['100'], ['0.1'], ['iid'], ['a'], combination]
-        control_name_interp = [['SGD'], ['100'], ['0.1'], ['iid'], ['a'], interp]
-        control_name_full = [['SGD'], ['100'], ['0.1'], ['iid'], ['b_a1', 'c_a1', 'd_a1', 'e_a1']]
+        control_name_combination = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'],
+                                    combination]
+        control_name_interp = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'], interp]
+        control_name_full = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'],
+                             ['b_a1', 'c_a1', 'd_a1', 'e_a1']]
         control_name = [control_name_combination, control_name_interp, control_name_full]
     else:
         raise ValueError('Not valid fed')

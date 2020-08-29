@@ -1,6 +1,6 @@
 import copy
-import numpy as np
 import torch
+import numpy as np
 from config import cfg
 from collections import OrderedDict
 
@@ -9,6 +9,16 @@ class Federation:
     def __init__(self, global_parameters, rate):
         self.global_parameters = global_parameters
         self.rate = rate
+
+    def make_scaler_rate(self):
+        if cfg['model_split_mode'] == 'dynamic':
+            rate_idx = np.random.choice(np.arange(len(self.rate)), cfg['num_users'], p=cfg['proportion'])
+            self.scaler_rate = np.array(self.rate)[rate_idx].tolist()
+        elif cfg['model_split_mode'] == 'fix':
+            self.scaler_rate = self.rate
+        else:
+            raise ValueError('Not valid model split mode')
+        return
 
     def split_model(self, user_idx):
         if cfg['model_name'] in ['conv', 'mlp']:
@@ -29,7 +39,7 @@ class Federation:
                                 if k == output_weight_name:
                                     output_idx_i_m = torch.arange(output_size, device=v.device)
                                 else:
-                                    local_output_size = int(np.ceil(output_size * self.rate[user_idx[m]]))
+                                    local_output_size = int(np.ceil(output_size * self.scaler_rate[user_idx[m]]))
                                     output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
                                 idx[m][k] = output_idx_i_m, input_idx_i_m
                                 idx_i[m] = output_idx_i_m
@@ -56,7 +66,7 @@ class Federation:
                                     if idx_i[m] is None:
                                         idx_i[m] = torch.arange(input_size, device=v.device)
                                     input_idx_i_m = idx_i[m]
-                                    local_output_size = int(np.ceil(output_size * self.rate[user_idx[m]]))
+                                    local_output_size = int(np.ceil(output_size * self.scaler_rate[user_idx[m]]))
                                     output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
                                     idx_i[m] = output_idx_i_m
                                 elif 'shortcut' in k:
@@ -84,6 +94,7 @@ class Federation:
         return idx
 
     def distribute(self, user_idx):
+        self.make_scaler_rate()
         param_idx = self.split_model(user_idx)
         local_parameters = [OrderedDict() for _ in range(len(user_idx))]
         for k, v in self.global_parameters.items():
