@@ -104,7 +104,6 @@ def train(data_loader, model, optimizer, logger, epoch):
         output = model(input)
         output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
         output['loss'].backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
         optimizer.step()
         evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
         logger.append(evaluation, 'train', n=input_size)

@@ -51,6 +51,7 @@ def main():
     for i in range(1, len(combination_mode) + 1):
         combination_mode_i = ['-'.join(list(x)) for x in itertools.combinations(combination_mode, i)]
         combination.extend(combination_mode_i)
+    combination = combination[5:]
     interp = []
     for i in range(1, 10):
         for j in range(len(model_split_mode)):
@@ -59,12 +60,14 @@ def main():
     if fed == 0:
         control_name = [[['SGD'], ['1'], ['1'], ['none'], ['fix'], model_split_mode]]
     elif fed == 1:
+        control_name_single = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a'],
+                               ['a1', 'b1', 'c1', 'd1', 'e1']]
         control_name_combination = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'],
                                     combination]
         control_name_interp = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'], interp]
-        control_name_full = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'],
+        control_name_full = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'],
                              ['b_a1', 'c_a1', 'd_a1', 'e_a1']]
-        control_name = [control_name_combination, control_name_interp, control_name_full]
+        control_name = [control_name_single, control_name_combination, control_name_interp, control_name_full]
     else:
         raise ValueError('Not valid fed')
     control_names = []

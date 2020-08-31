@@ -33,6 +33,7 @@ cfg['pivot'] = -float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
 cfg['track'] = False
 
+
 def main():
     process_control()
     seeds = list(range(cfg['init_seed'], cfg['init_seed'] + cfg['num_experiments']))
@@ -175,7 +176,6 @@ class Local:
                 optimizer.zero_grad()
                 output = model(input)
                 output['loss'].backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 optimizer.step()
                 evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
                 logger.append(evaluation, 'train', n=input_size)
