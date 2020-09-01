@@ -1,4 +1,6 @@
 import torch
+import torch.nn.functional as F
+
 from utils import recur
 
 
@@ -11,10 +13,18 @@ def Accuracy(output, target, topk=1):
     return acc
 
 
+def Perplexity(output, target):
+    with torch.no_grad():
+        bce = F.cross_entropy(output, target)
+        perplexity = torch.exp(bce).item()
+    return perplexity
+
+
 class Metric(object):
     def __init__(self):
         self.metric = {'Loss': (lambda input, output: output['loss'].item()),
-                       'Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label']))}
+                       'Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
+                       'Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['nsymbol']))}
 
     def evaluate(self, metric_names, input, output):
         evaluation = {}

@@ -42,7 +42,7 @@ class Federation:
                                 else:
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
                                     local_output_size = int(np.ceil(output_size * scaler_rate))
-                                    output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
+                                    output_idx_i_m = torch.arange(output_size, device=v.device)[:local_output_size]
                                 idx[m][k] = output_idx_i_m, input_idx_i_m
                                 idx_i[m] = output_idx_i_m
                             else:
@@ -70,7 +70,7 @@ class Federation:
                                     input_idx_i_m = idx_i[m]
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
                                     local_output_size = int(np.ceil(output_size * scaler_rate))
-                                    output_idx_i_m = torch.randperm(output_size, device=v.device)[:local_output_size]
+                                    output_idx_i_m = torch.arange(output_size, device=v.device)[:local_output_size]
                                     idx_i[m] = output_idx_i_m
                                 elif 'shortcut' in k:
                                     input_idx_i_m = idx[m][k.replace('shortcut', 'conv1')][1]

@@ -98,7 +98,15 @@ def recur(fn, input, *args):
 
 
 def process_dataset(dataset):
-    cfg['classes_size'] = dataset.classes_size
+    if cfg['data_name'] in ['MNIST', 'CIFAR10']:
+        cfg['classes_size'] = dataset['train'].classes_size
+    elif cfg['data_name'] in ['MNIST', 'CIFAR10']:
+        cfg['vocab'] = dataset['train'].vocab
+        cfg['num_tokens'] = len(dataset['train'].vocab)
+        for split in dataset:
+            dataset[split].token = batchify(dataset[split].token, cfg['batch_size'][split])
+    else:
+        raise ValueError('Not valid data name')
     return
 
 
@@ -130,11 +138,12 @@ def process_control():
         for i in range(len(mode_rate)):
             cfg['model_rate'] += np.repeat(mode_rate[i], num_users_proportion * proportion[i]).tolist()
         cfg['model_rate'] = cfg['model_rate'] + [cfg['model_rate'][-1] for _ in
-                                               range(cfg['num_users'] - len(cfg['model_rate']))]
+                                                 range(cfg['num_users'] - len(cfg['model_rate']))]
     else:
         raise ValueError('Not valid model split mode')
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
+    cfg['transformer'] = {'embedding_size': 200, 'hidden_size': 512, 'num_heads': 8, 'num_layers': 6, 'dropout': 0.1}
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
         if cfg['optimizer_name'] == 'SGD':
@@ -184,8 +193,28 @@ def process_control():
             cfg['batch_size'] = {'train': 128, 'test': 512}
             cfg['lr'] = 1e-1
             cfg['milestones'] = [150, 250]
-    elif cfg['data_name'] in ['ImageNet']:
-        cfg['data_shape'] = [3, 224, 224]
+    elif cfg['data_name'] in ['PennTreebank', 'WikiText2', 'WikiText103']:
+        if cfg['optimizer_name'] == 'Adam':
+            cfg['weight_decay'] = 0
+            cfg['scheduler_name'] = 'NoamLR'
+            cfg['warm_up'] = 4000
+        else:
+            raise ValueError('Not valid optimizer')
+        if cfg['data_split_mode'] != 'none':
+            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['lr'] = 1e-3
+            cfg['milestones'] = [150, 250]
+        elif cfg['data_split_mode'] == 'non-iid':
+            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['lr'] = 1e-3
+            cfg['milestones'] = [150, 250]
+        else:
+            cfg['num_epochs'] = 400
+            cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['lr'] = 1e-3
+            cfg['milestones'] = [150, 250]
     else:
         raise ValueError('Not valid dataset')
     return
@@ -261,6 +290,8 @@ def make_scheduler(optimizer):
     elif cfg['scheduler_name'] == 'CosineAnnealingLR':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['global'],
                                                          eta_min=cfg['min_lr'])
+    elif cfg['scheduler_name'] == 'NoamLR':
+        scheduler = NoamLR(optimizer, cfg['hidden_size'], cfg['warm_up'])
     elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
                                                          patience=cfg['patience'], verbose=True,
@@ -322,3 +353,32 @@ def collate(input):
     for k in input:
         input[k] = torch.stack(input[k], 0)
     return input
+
+
+def batchify(data, batch_size):
+    num_batch = data.size(0) // batch_size
+    data = data.narrow(0, 0, num_batch * batch_size)
+    data = data.reshape(batch_size, -1)
+    return data
+
+
+def make_batch(data, i, seq_len):
+    seq_len = min(seq_len, data.size(1) - 1 - i)
+    input = {'symbol': data[:, i:i + seq_len], 'nsymbol': data[:, i + 1:i + 1 + seq_len]}
+    return input
+
+
+from torch.optim.lr_scheduler import _LRScheduler
+
+
+class NoamLR(_LRScheduler):
+
+    def __init__(self, optimizer, hidden_size, warm_up):
+        super().__init__(optimizer)
+        self.hidden_size = hidden_size
+        self.warm_up = warm_up
+
+    def get_lr(self):
+        last_epoch = max(1, self.last_epoch)
+        scale = self.hidden_size ** (-0.5) * min(last_epoch ** (-0.5), last_epoch * self.warm_up ** (-1.5))
+        return [base_lr * scale for base_lr in self.base_lrs]

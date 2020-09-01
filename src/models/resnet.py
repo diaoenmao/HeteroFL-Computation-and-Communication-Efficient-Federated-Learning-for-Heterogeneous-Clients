@@ -28,10 +28,10 @@ class Block(nn.Module):
             self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = self.scaler(F.relu(self.n1(x)))
+        out = F.relu(self.n1(self.scaler(x)))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
-        out = self.conv2(self.scaler(F.relu(self.n2(out))))
+        out = self.conv2(F.relu(self.n2(self.scaler(out))))
         out += shortcut
         return out
 
@@ -53,11 +53,11 @@ class Bottleneck(nn.Module):
             self.shortcut = nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False)
 
     def forward(self, x):
-        out = self.scaler(F.relu(self.n1(x)))
+        out = F.relu(self.n1(self.scaler(x)))
         shortcut = self.shortcut(out) if hasattr(self, 'shortcut') else x
         out = self.conv1(out)
-        out = self.conv2(self.scaler(F.relu(self.n2(out))))
-        out = self.conv3(self.scaler(F.relu(self.n3(out))))
+        out = self.conv2(F.relu(self.n2(self.scaler(out))))
+        out = self.conv3(F.relu(self.n3(self.scaler(out))))
         out += shortcut
         return out
 
@@ -91,7 +91,7 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = self.scaler(F.relu(self.n4(out)))
+        out = F.relu(self.n4(self.scaler(out)))
         out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         out = self.linear(out)

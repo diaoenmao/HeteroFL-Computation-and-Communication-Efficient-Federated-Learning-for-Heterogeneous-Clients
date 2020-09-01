@@ -44,7 +44,7 @@ def runExperiment():
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
-    process_dataset(dataset['train'])
+    process_dataset(dataset)
     data_loader = make_data_loader(dataset)
     load_tag = 'best'
     if cfg['data_split_mode'] != 'none':

@@ -11,15 +11,15 @@ class Conv(nn.Module):
     def __init__(self, data_shape, hidden_size, classes_size, rate=1, track=False):
         super().__init__()
         blocks = [nn.Conv2d(data_shape[0], hidden_size[0], 3, 1, 1),
+                  Scaler(rate),
                   nn.BatchNorm2d(hidden_size[0], momentum=None, track_running_stats=track),
                   nn.ReLU(inplace=True),
-                  Scaler(rate),
                   nn.MaxPool2d(2)]
         for i in range(len(hidden_size) - 1):
             blocks.extend([nn.Conv2d(hidden_size[i], hidden_size[i + 1], 3, 1, 1),
+                           Scaler(rate),
                            nn.BatchNorm2d(hidden_size[i + 1], momentum=None, track_running_stats=track),
                            nn.ReLU(inplace=True),
-                           Scaler(rate),
                            nn.MaxPool2d(2)])
         blocks = blocks[:-1]
         blocks.extend([nn.AdaptiveAvgPool2d(1),

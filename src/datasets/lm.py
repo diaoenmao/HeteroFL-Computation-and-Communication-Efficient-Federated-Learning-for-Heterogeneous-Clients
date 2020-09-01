@@ -1,9 +1,8 @@
 import os
-from abc import abstractmethod
-
 import torch
+from abc import abstractmethod
 from torch.utils.data import Dataset
-from utils import makedir_exist_ok, save, load
+from utils import check_exists, makedir_exist_ok, save, load
 from .utils import download_url, extract_file
 
 
@@ -11,7 +10,6 @@ class Vocab:
     def __init__(self):
         self.symbol_to_index = {}
         self.index_to_symbol = []
-        self.symbol_counts = {}
 
     def add(self, symbol):
         if symbol not in self.symbol_to_index:
@@ -25,29 +23,22 @@ class Vocab:
             self.symbol_to_index.pop(symbol, None)
         return
 
-    def count(self, input):
-        if isinstance(input, int):
-            count = self.symbol_counts[self.index_to_symbol[input]]
-        elif isinstance(input, str):
-            count = self.symbol_counts[input]
-        else:
-            raise ValueError('wrong input data type')
-        return count
-
-    def symbol_counts(self):
-        counts = sorted(self.symbol_counts.items(), key=lambda x: x[1], reverse=True)
-        return counts
-
     def __len__(self):
-        return len(self.index_to_symbol)
+        return len(self.index_to_symbol) + 1
 
     def __getitem__(self, input):
         if isinstance(input, int):
-            output = self.index_to_symbol[input]
+            if input == len(self.index_to_symbol):
+                output = '<ukn>'
+            else:
+                output = self.index_to_symbol[input]
         elif isinstance(input, str):
-            output = self.symbol_to_index[input]
+            if input not in self.symbol_to_index:
+                output = '<ukn>'
+            else:
+                output = self.symbol_to_index[input]
         else:
-            raise ValueError('wrong input data type')
+            raise ValueError('Not valid data type')
         return output
 
     def __contains__(self, input):
@@ -56,19 +47,17 @@ class Vocab:
         elif isinstance(input, str):
             exist = input in self.symbol_to_index
         else:
-            raise ValueError('wrong input data type')
+            raise ValueError('Not valid data type')
         return exist
 
 
 class LanguageModeling(Dataset):
-    def __init__(self, root, split, download):
-        self.data_name = None
+    def __init__(self, root, split):
         self.root = os.path.expanduser(root)
-        if download:
-            self.download()
-        if not self._check_exists():
-            raise RuntimeError('Dataset not found. You can use download=True to download it')
-        self.data = load(os.path.join(self.processed_folder, '{}.pt'.format(split)))
+        self.split = split
+        if not check_exists(self.processed_folder):
+            self.process()
+        self.token = load(os.path.join(self.processed_folder, '{}.pt'.format(split)))
         self.vocab = load(os.path.join(self.processed_folder, 'meta.pt'.format(split)))
 
     @property
@@ -83,132 +72,138 @@ class LanguageModeling(Dataset):
         return os.path.exists(self.processed_folder)
 
     @abstractmethod
+    def process(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def download(self):
         raise NotImplementedError
 
     def __repr__(self):
-        fmt_str = 'Dataset ' + self.data_name + '\n'
-        fmt_str += '    Root Location: {}\n'.format(self.root)
+        fmt_str = 'Dataset {}\nSize: {}\nRoot: {}\nSplit: {}'.format(
+            self.__class__.__name__, self.__len__(), self.root, self.split)
         return fmt_str
 
 
 class PennTreebank(LanguageModeling):
     data_name = 'PennTreebank'
-    urls = ['https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.train.txt',
-           'https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.valid.txt',
-           'https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.test.txt']
-    data_file = {'train':'ptb.train.txt', 'validation':'ptb.valid.txt', 'test':'ptb.test.txt'}
+    file = [('https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.train.txt', None),
+            ('https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.valid.txt', None),
+            ('https://raw.githubusercontent.com/wojzaremba/lstm/master/data/ptb.test.txt', None)]
 
-    def __init__(self, root, split, download=False):
-        super(PennTreebank, self).__init__(root, split, download)
+    def __init__(self, root, split):
+        super().__init__(root, split)
+
+    def process(self):
+        if not check_exists(self.raw_folder):
+            self.download()
+        train_set, valid_set, test_set, meta = self.make_data()
+        save(train_set, os.path.join(self.processed_folder, 'train.pt'))
+        save(valid_set, os.path.join(self.processed_folder, 'valid.pt'))
+        save(test_set, os.path.join(self.processed_folder, 'test.pt'))
+        save(meta, os.path.join(self.processed_folder, 'meta.pt'))
+        return
 
     def download(self):
-        if self._check_exists():
-            return
-        makedir_exist_ok(os.path.join(self.raw_folder))
-        for url in self.urls:
+        makedir_exist_ok(self.raw_folder)
+        for (url, md5) in self.file:
             filename = os.path.basename(url)
-            download_url(url, root=self.raw_folder, filename=filename, md5=None)
-        vocab = Vocab()
-        for split in self.data_file:
-            token_path = os.path.join(self.raw_folder, self.data_file[split])
-            num_tokens = 0
-            with open(token_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    num_tokens += len(line)
-                    for symbol in line:
-                        vocab.add(symbol)
-            with open(token_path, 'r', encoding='utf-8') as f:
-                data = torch.LongTensor(num_tokens)
-                i = 0
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    for symbol in line:
-                        data[i] = vocab.symbol_to_index[symbol]
-                        i += 1
-            save(data, os.path.join(self.processed_folder, '{}.pt'.format(split)))
-        save(vocab, os.path.join(self.processed_folder, 'meta.pt'))
+            download_url(url, self.raw_folder, filename, md5)
         return
+
+    def make_data(self):
+        vocab = Vocab()
+        read_token(vocab, os.path.join(self.raw_folder, 'ptb.train.txt'))
+        read_token(vocab, os.path.join(self.raw_folder, 'ptb.valid.txt'))
+        train_token = make_token(vocab, os.path.join(self.raw_folder, 'ptb.train.txt'))
+        valid_token = make_token(vocab, os.path.join(self.raw_folder, 'ptb.valid.txt'))
+        test_token = make_token(vocab, os.path.join(self.raw_folder, 'ptb.test.txt'))
+        return train_token, valid_token, test_token, vocab
 
 
 class WikiText2(LanguageModeling):
     data_name = 'WikiText2'
-    url = 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip'
-    data_file = {'train':'wiki.train.tokens', 'validation':'wiki.valid.tokens', 'test':'wiki.test.tokens'}
+    file = [('https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-v1.zip', None)]
 
-    def __init__(self, root, split, download=False):
-        super(WikiText2, self).__init__(root, split, download)
+    def __init__(self, root, split):
+        super().__init__(root, split)
+
+    def process(self):
+        if not check_exists(self.raw_folder):
+            self.download()
+        train_set, valid_set, test_set, meta = self.make_data()
+        save(train_set, os.path.join(self.processed_folder, 'train.pt'))
+        save(valid_set, os.path.join(self.processed_folder, 'valid.pt'))
+        save(test_set, os.path.join(self.processed_folder, 'test.pt'))
+        save(meta, os.path.join(self.processed_folder, 'meta.pt'))
+        return
 
     def download(self):
-        if self._check_exists():
-            return
-        makedir_exist_ok(os.path.join(self.raw_folder))
-        filename = os.path.basename(self.url)
-        file_path = os.path.join(self.raw_folder, filename)
-        download_url(self.url, root=self.raw_folder, filename=filename, md5=None)
-        extract_file(file_path)
-        vocab = Vocab()
-        for split in self.data_file:
-            token_path = os.path.join(self.raw_folder, 'wikitext-2', self.data_file[split])
-            num_tokens = 0
-            with open(token_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    num_tokens += len(line)
-                    for symbol in line:
-                        vocab.add(symbol)
-            with open(token_path, 'r', encoding='utf-8') as f:
-                data = torch.LongTensor(num_tokens)
-                i = 0
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    for symbol in line:
-                        data[i] = vocab.symbol_to_index[symbol]
-                        i += 1
-            save(data, os.path.join(self.processed_folder, '{}.pt'.format(split)))
-        save(vocab, os.path.join(self.processed_folder, 'meta.pt'))
+        makedir_exist_ok(self.raw_folder)
+        for (url, md5) in self.file:
+            filename = os.path.basename(url)
+            download_url(url, self.raw_folder, filename, md5)
         return
+
+    def make_data(self):
+        vocab = Vocab()
+        read_token(vocab, os.path.join(self.raw_folder, 'wikitext-2', 'wiki.train.tokens'))
+        read_token(vocab, os.path.join(self.raw_folder, 'wikitext-2', 'wiki.train.tokens'))
+        train_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-2', 'wiki.train.tokens'))
+        valid_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-2', 'wiki.valid.tokens'))
+        test_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-2', 'wiki.test.tokens'))
+        return train_token, valid_token, test_token, vocab
 
 
 class WikiText103(LanguageModeling):
     data_name = 'WikiText103'
-    url = 'https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip'
-    data_file = {'train':'wiki.train.tokens', 'validation':'wiki.valid.tokens', 'test':'wiki.test.tokens'}
+    file = [('https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip', None)]
 
-    def __init__(self, root, split, download=False):
-        super(WikiText103, self).__init__(root, split, download)
+    def __init__(self, root, split):
+        super().__init__(root, split)
 
-    @property
-    def data_path(self):
-        return os.path.join(self.root, 'wiki')
+    def process(self):
+        if not check_exists(self.raw_folder):
+            self.download()
+        train_set, valid_set, test_set, meta = self.make_data()
+        save(train_set, os.path.join(self.processed_folder, 'train.pt'))
+        save(valid_set, os.path.join(self.processed_folder, 'valid.pt'))
+        save(test_set, os.path.join(self.processed_folder, 'test.pt'))
+        save(meta, os.path.join(self.processed_folder, 'meta.pt'))
+        return
 
     def download(self):
-        if self._check_exists():
-            return
-        makedir_exist_ok(os.path.join(self.raw_folder))
-        filename = os.path.basename(self.url)
-        file_path = os.path.join(self.raw_folder, filename)
-        download_url(self.url, root=self.raw_folder, filename=filename, md5=None)
-        extract_file(file_path)
-        vocab = Vocab()
-        for split in self.data_file:
-            token_path = os.path.join(self.raw_folder, 'wikitext-103', self.data_file[split])
-            num_tokens = 0
-            with open(token_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    num_tokens += len(line)
-                    for symbol in line:
-                        vocab.add(symbol)
-            with open(token_path, 'r', encoding='utf-8') as f:
-                data = torch.LongTensor(num_tokens)
-                i = 0
-                for line in f:
-                    line = line.split() + [u'<eos>']
-                    for symbol in line:
-                        data[i] = vocab.symbol_to_index[symbol]
-                        i += 1
-            save(data, os.path.join(self.processed_folder, '{}.pt'.format(split)))
-        save(vocab, os.path.join(self.processed_folder, 'meta.pt'))
+        makedir_exist_ok(self.raw_folder)
+        for (url, md5) in self.file:
+            filename = os.path.basename(url)
+            download_url(url, self.raw_folder, filename, md5)
         return
+
+    def make_data(self):
+        vocab = Vocab()
+        read_token(vocab, os.path.join(self.raw_folder, 'wikitext-103', 'wiki.train.tokens'))
+        read_token(vocab, os.path.join(self.raw_folder, 'wikitext-103', 'wiki.train.tokens'))
+        train_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-103', 'wiki.train.tokens'))
+        valid_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-103', 'wiki.valid.tokens'))
+        test_token = make_token(vocab, os.path.join(self.raw_folder, 'wikitext-103', 'wiki.test.tokens'))
+        return train_token, valid_token, test_token, vocab
+
+
+def read_token(vocab, token_path):
+    with open(token_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.split() + [u'<eos>']
+            for symbol in line:
+                vocab.add(symbol)
+    return
+
+
+def make_token(vocab, token_path):
+    token = []
+    with open(token_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.split() + [u'<eos>']
+            for symbol in line:
+                token.append(vocab.symbol_to_index[symbol])
+    token = torch.tensor(token, dtype=torch.long)
+    return token
