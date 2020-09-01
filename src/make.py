@@ -58,16 +58,12 @@ def main():
             for k in range(j + 1, len(model_split_mode)):
                 interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
     if fed == 0:
-        control_name = [[['SGD'], ['1'], ['1'], ['none'], ['fix'], model_split_mode]]
+        control_name = [[['SGD'], ['1'], ['1'], ['none'], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]]
     elif fed == 1:
-        control_name_single = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a'],
-                               ['a1', 'b1', 'c1', 'd1', 'e1']]
-        control_name_combination = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'],
-                                    combination]
-        control_name_interp = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix', 'dynamic'], ['a'], interp]
-        control_name_full = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'],
-                             ['b_a1', 'c_a1', 'd_a1', 'e_a1']]
-        control_name = [control_name_single, control_name_combination, control_name_interp, control_name_full]
+        control_name_single = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
+        control_name_combination = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]
+        control_name_interp = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp]
+        control_name = [control_name_single, control_name_combination, control_name_interp]
     else:
         raise ValueError('Not valid fed')
     control_names = []

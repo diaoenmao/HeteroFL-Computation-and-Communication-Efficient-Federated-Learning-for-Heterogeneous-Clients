@@ -48,11 +48,11 @@ def runExperiment():
     data_loader = make_data_loader(dataset)
     load_tag = 'best'
     if cfg['data_split_mode'] != 'none':
-        model = eval('models.{}(cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
+        model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                      .format(cfg['model_name']))
         last_epoch, _, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
     else:
-        model = eval('models.{}(cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
+        model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                      .format(cfg['model_name']))
         last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')

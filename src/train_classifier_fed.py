@@ -56,7 +56,7 @@ def runExperiment():
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
-    federation = Federation(global_parameters, cfg['rate'])
+    federation = Federation(global_parameters, cfg['model_rate'])
     if cfg['resume_mode'] == 1:
         last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer,
                                                                              scheduler)
@@ -115,7 +115,7 @@ def train(dataset, data_split, federation, global_model, optimizer, logger, epoc
             info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Epoch: {}'.format(epoch),
                              'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
                              'Learning rate: {}'.format(lr),
-                             'Rate: {}'.format(federation.scaler_rate[user_idx[m]]),
+                             'Rate: {}'.format(federation.model_rate[user_idx[m]]),
                              'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
@@ -150,21 +150,20 @@ def make_local(dataset, data_split, federation):
     local_parameters, param_idx = federation.distribute(user_idx)
     local = [None for _ in range(num_active_users)]
     for m in range(num_active_users):
-        rate_m = federation.scaler_rate[user_idx[m]]
+        model_rate_m = federation.model_rate[user_idx[m]]
         data_loader_m = make_data_loader({'train': SplitDataset(dataset, data_split[user_idx[m]])})['train']
-        local[m] = Local(rate_m, data_loader_m)
+        local[m] = Local(model_rate_m, data_loader_m)
     return local, local_parameters, user_idx, param_idx
 
 
 class Local:
-    def __init__(self, rate, data_loader):
-        self.rate = rate
+    def __init__(self, model_rate, data_loader):
+        self.model_rate = model_rate
         self.data_loader = data_loader
 
     def train(self, local_parameters, lr, logger):
         metric = Metric()
-        model = eval('models.{}(model_rate=cfg["global_model_rate"] * self.rate, '
-                     'scaler_rate=self.rate).to(cfg["device"])'.format(cfg['model_name']))
+        model = eval('models.{}(model_rate=self.model_rate).to(cfg["device"])'.format(cfg['model_name']))
         model.load_state_dict(local_parameters)
         model.train()
         optimizer = make_optimizer(model, lr)

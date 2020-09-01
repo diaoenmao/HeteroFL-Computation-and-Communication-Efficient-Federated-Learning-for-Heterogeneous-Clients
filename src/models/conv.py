@@ -35,10 +35,11 @@ class Conv(nn.Module):
         return output
 
 
-def conv(model_rate=1, scaler_rate=1):
+def conv(model_rate=1):
     data_shape = cfg['data_shape']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['conv']['hidden_size']]
     classes_size = cfg['classes_size']
+    scaler_rate = model_rate / cfg['global_model_rate']
     track = cfg['track']
     cfg['model'] = {}
     model = Conv(data_shape, hidden_size, classes_size, scaler_rate, track)

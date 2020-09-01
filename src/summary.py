@@ -24,7 +24,8 @@ if args['control_name']:
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['batch_size'] = {'train': 2, 'test': 2}
-rate = 1
+cfg['track'] = False
+
 
 def main():
     process_control()
@@ -36,7 +37,7 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset['train'])
     data_loader = make_data_loader(dataset)
-    model = eval('models.{}(rate=rate).to(cfg["device"])'.format(cfg['model_name']))
+    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     summary = summarize(data_loader['train'], model)
     content = parse_summary(summary)
     print(content)

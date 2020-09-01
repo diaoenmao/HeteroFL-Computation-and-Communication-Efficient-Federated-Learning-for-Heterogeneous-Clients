@@ -6,8 +6,7 @@ control:
   frac: '0.1'
   data_split_mode: 'iid'
   model_split_mode: 'fix'
-  global_model_mode: 'a'
-  fed_model_mode: 'a1-b1-c1-d1-e1'
+  model_mode: 'a1-b1-c1-d1-e1'
 # data
 data_name: MNIST
 subset: label

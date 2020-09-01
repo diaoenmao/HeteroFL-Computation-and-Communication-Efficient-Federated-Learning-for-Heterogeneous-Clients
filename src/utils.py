@@ -109,30 +109,30 @@ def process_control():
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
     cfg['model_split_mode'] = cfg['control']['model_split_mode']
-    cfg['global_model_mode'] = cfg['control']['global_model_mode']
+    cfg['model_mode'] = cfg['control']['model_mode']
+    cfg['global_model_mode'] = cfg['model_mode'][0]
     cfg['global_model_rate'] = cfg['model_split_rate'][cfg['global_model_mode']]
-    if 'fed_model_mode' in cfg['control']:
-        cfg['fed_model_mode'] = cfg['control']['fed_model_mode']
-        fed_model_mode = cfg['fed_model_mode'].split('-')
-        if cfg['model_split_mode'] == 'dynamic':
-            rate, proportion = [], []
-            for m in fed_model_mode:
-                rate.append(cfg['model_split_rate'][m[0]])
-                proportion.append(int(m[1:]))
-            cfg['rate'] = rate
-            cfg['proportion'] = (np.array(proportion) / sum(proportion)).tolist()
-        elif cfg['model_split_mode'] == 'fix':
-            rate, proportion = [], []
-            for m in fed_model_mode:
-                rate.append(cfg['model_split_rate'][m[0]])
-                proportion.append(int(m[1:]))
-            num_users_proportion = cfg['num_users'] // sum(proportion)
-            cfg['rate'] = []
-            for i in range(len(rate)):
-                cfg['rate'] += np.repeat(rate[i], num_users_proportion * proportion[i]).tolist()
-            cfg['rate'] = cfg['rate'] + [cfg['rate'][-1] for _ in range(cfg['num_users'] - len(cfg['rate']))]
-        else:
-            raise ValueError('Not valid model split mode')
+    model_mode = cfg['model_mode'].split('-')
+    if cfg['model_split_mode'] == 'dynamic':
+        mode_rate, proportion = [], []
+        for m in model_mode:
+            mode_rate.append(cfg['model_split_rate'][m[0]])
+            proportion.append(int(m[1:]))
+        cfg['model_rate'] = mode_rate
+        cfg['proportion'] = (np.array(proportion) / sum(proportion)).tolist()
+    elif cfg['model_split_mode'] == 'fix':
+        mode_rate, proportion = [], []
+        for m in model_mode:
+            mode_rate.append(cfg['model_split_rate'][m[0]])
+            proportion.append(int(m[1:]))
+        num_users_proportion = cfg['num_users'] // sum(proportion)
+        cfg['model_rate'] = []
+        for i in range(len(mode_rate)):
+            cfg['model_rate'] += np.repeat(mode_rate[i], num_users_proportion * proportion[i]).tolist()
+        cfg['model_rate'] = cfg['model_rate'] + [cfg['model_rate'][-1] for _ in
+                                               range(cfg['num_users'] - len(cfg['model_rate']))]
+    else:
+        raise ValueError('Not valid model split mode')
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
     if cfg['data_name'] in ['MNIST']:
