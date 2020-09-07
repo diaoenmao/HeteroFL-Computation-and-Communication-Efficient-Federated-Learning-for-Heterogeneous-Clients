@@ -78,6 +78,8 @@ class Federation:
                                 elif 'linear' in k:
                                     input_idx_i_m = idx_i[m]
                                     output_idx_i_m = torch.arange(output_size, device=v.device)
+                                else:
+                                    raise ValueError('Not valid k')
                                 idx[m][k] = (output_idx_i_m, input_idx_i_m)
                             else:
                                 input_idx_i_m = idx_i[m]

@@ -178,16 +178,16 @@ def process_control():
             cfg['factor'] = 0.1
         else:
             raise ValueError('Not valid optimizer')
-        if cfg['data_split_mode'] != 'none':
+        if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
             cfg['lr'] = 1e-1
             cfg['milestones'] = [150, 250]
         elif cfg['data_split_mode'] == 'non-iid':
-            cfg['num_epochs'] = {'global': 400, 'local': 5}
+            cfg['num_epochs'] = {'global': 800, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
             cfg['lr'] = 1e-1
-            cfg['milestones'] = [150, 250]
+            cfg['milestones'] = [300, 500]
         else:
             cfg['num_epochs'] = 400
             cfg['batch_size'] = {'train': 128, 'test': 512}
@@ -200,7 +200,7 @@ def process_control():
             cfg['warm_up'] = 4000
         else:
             raise ValueError('Not valid optimizer')
-        if cfg['data_split_mode'] != 'none':
+        if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 64}
             cfg['lr'] = 1e-3
