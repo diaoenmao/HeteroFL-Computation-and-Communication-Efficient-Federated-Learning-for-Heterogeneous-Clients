@@ -102,3 +102,15 @@ import time
 #         comb.extend(comb_i)
 #     print(comb)
 #     print(len(comb))
+
+
+# if __name__ == '__main__':
+#     x = torch.randn(100, 128)
+#     m = nn.Linear(128,10)
+#     y = m(x)
+#     label = torch.zeros(100, dtype=torch.long)
+#     loss = F.cross_entropy(y, label)
+#     loss.backward()
+#     print(m.weight.grad[0])
+#     print(m.weight.grad[1])
+#     print(m.weight.grad[9])

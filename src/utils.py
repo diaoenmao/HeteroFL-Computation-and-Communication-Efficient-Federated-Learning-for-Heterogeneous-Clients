@@ -147,6 +147,7 @@ def process_control():
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
         if cfg['optimizer_name'] == 'SGD':
+            cfg['lr'] = 1e-2
             cfg['momentum'] = 0.9
             cfg['weight_decay'] = 5e-4
             cfg['scheduler_name'] = 'MultiStepLR'
@@ -155,43 +156,37 @@ def process_control():
             raise ValueError('Not valid optimizer')
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 200, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['lr'] = 1e-2
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [100]
         elif cfg['data_split_mode'] == 'non-iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['lr'] = 1e-2
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [200]
         else:
             cfg['num_epochs'] = 200
-            cfg['batch_size'] = {'train': 128, 'test': 512}
-            cfg['lr'] = 1e-2
+            cfg['batch_size'] = {'train': 100, 'test': 500}
             cfg['milestones'] = [100]
     elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
         if cfg['optimizer_name'] == 'SGD':
+            cfg['lr'] = 1e-1
             cfg['momentum'] = 0.9
             cfg['weight_decay'] = 5e-4
             cfg['scheduler_name'] = 'MultiStepLR'
-            cfg['milestones'] = [200]
             cfg['factor'] = 0.1
         else:
             raise ValueError('Not valid optimizer')
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['lr'] = 1e-1
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [150, 250]
         elif cfg['data_split_mode'] == 'non-iid':
             cfg['num_epochs'] = {'global': 800, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
-            cfg['lr'] = 1e-1
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [300, 500]
         else:
             cfg['num_epochs'] = 400
-            cfg['batch_size'] = {'train': 128, 'test': 512}
-            cfg['lr'] = 1e-1
+            cfg['batch_size'] = {'train': 100, 'test': 500}
             cfg['milestones'] = [150, 250]
     elif cfg['data_name'] in ['PennTreebank', 'WikiText2', 'WikiText103']:
         if cfg['optimizer_name'] == 'Adam':
@@ -202,17 +197,17 @@ def process_control():
             raise ValueError('Not valid optimizer')
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
         elif cfg['data_split_mode'] == 'non-iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 64}
+            cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
         else:
             cfg['num_epochs'] = 400
-            cfg['batch_size'] = {'train': 128, 'test': 512}
+            cfg['batch_size'] = {'train': 100, 'test': 500}
             cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
     else:

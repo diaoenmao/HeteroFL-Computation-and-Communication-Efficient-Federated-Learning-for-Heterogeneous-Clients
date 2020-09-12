@@ -63,9 +63,9 @@ def split_dataset(dataset, num_users, data_split_mode):
         idx = idx[sorted_indices]
         for i in range(num_users):
             pivot = np.random.choice(idx_shard, 2, replace=False)
-            idx_shard = list(set(idx_shard) - set(pivot))
             data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
                             idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
+            idx_shard = list(set(idx_shard) - set(pivot))
     elif data_split_mode == 'none':
         data_split = {}
         for i in range(num_users):
