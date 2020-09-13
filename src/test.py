@@ -104,13 +104,25 @@ import time
 #     print(len(comb))
 
 
-# if __name__ == '__main__':
-#     x = torch.randn(100, 128)
-#     m = nn.Linear(128,10)
-#     y = m(x)
-#     label = torch.zeros(100, dtype=torch.long)
-#     loss = F.cross_entropy(y, label)
-#     loss.backward()
-#     print(m.weight.grad[0])
-#     print(m.weight.grad[1])
-#     print(m.weight.grad[9])
+if __name__ == '__main__':
+    torch.manual_seed(0)
+    x = torch.randn(100, 20)
+    C = 10
+    m = nn.Linear(20, C)
+    optimizer = torch.optim.SGD(m.parameters(), lr=0.01)
+    c = 2
+    label = torch.arange(c).repeat(100 // c)
+    print(label)
+    norm = m.weight.abs().mean(dim=1)
+    print(norm)
+    for i in range(100):
+        y = m(x)
+        mask = torch.zeros(10)
+        mask[:c] = 1
+        y = y * mask
+        loss = F.cross_entropy(y, label)
+        loss.backward()
+        optimizer.step()
+    norm = m.weight.abs().mean(dim=1)
+    print(loss)
+    print(norm)

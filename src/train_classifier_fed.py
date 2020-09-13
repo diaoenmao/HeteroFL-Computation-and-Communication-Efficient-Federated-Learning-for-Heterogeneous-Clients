@@ -120,7 +120,7 @@ def train(dataset, data_split, label_split, federation, global_model, optimizer,
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
             logger.write('train', cfg['metric_name']['train'])
-    federation.combine(local_parameters, param_idx)
+    federation.combine(local_parameters, param_idx, user_idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 
@@ -160,27 +160,19 @@ class Local:
     def __init__(self, model_rate, data_loader, label_split):
         self.model_rate = model_rate
         self.data_loader = data_loader
-        self.label_map, self.classes_size = self.make_label_map(label_split)
-
-    def make_label_map(self, label_split):
-        unique_label_split = torch.tensor(label_split).unique()
-        classes_size = unique_label_split.size(0)
-        label_map = torch.zeros(cfg['classes_size'], dtype=torch.long)
-        label_map[unique_label_split] = torch.arange(classes_size)
-        return label_map, classes_size
+        self.label_split = label_split
 
     def train(self, local_parameters, lr, logger):
         metric = Metric()
-        model = eval('models.{}(model_rate=self.model_rate, classes_size=self.classes_size).to(cfg["device"])'
-                     .format(cfg['model_name']))
+        model = eval('models.{}(model_rate=self.model_rate).to(cfg["device"])'.format(cfg['model_name']))
         model.load_state_dict(local_parameters)
         model.train()
         optimizer = make_optimizer(model, lr)
         for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
             for i, input in enumerate(self.data_loader):
                 input = collate(input)
-                input[cfg['subset']] = self.label_map[input[cfg['subset']]]
                 input_size = input['img'].size(0)
+                input['label_split'] = torch.tensor(self.label_split)
                 input = to_device(input, cfg['device'])
                 optimizer.zero_grad()
                 output = model(input)

@@ -30,7 +30,12 @@ class Conv(nn.Module):
     def forward(self, input):
         output = {'loss': torch.tensor(0, device=cfg['device'], dtype=torch.float32)}
         x = input['img']
-        output['score'] = self.blocks(x)
+        out = self.blocks(x)
+        if 'label_split' in input:
+            mask = torch.zeros(cfg['classes_size'], device=out.device)
+            mask[input['label_split']] = 1
+            out = out * mask
+        output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['label'], reduction='mean')
         return output
 

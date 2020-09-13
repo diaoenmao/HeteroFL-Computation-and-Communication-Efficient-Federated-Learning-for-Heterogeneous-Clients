@@ -95,14 +95,18 @@ class ResNet(nn.Module):
         out = F.adaptive_avg_pool2d(out, 1)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
+        if 'label_split' in input:
+            mask = torch.zeros(cfg['classes_size'], device=out.device)
+            mask[input['label_split']] = 1
+            out = out * mask
         output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['label'])
         return output
 
 
-def resnet18(model_rate=1, classes_size=None):
+def resnet18(model_rate=1):
     data_shape = cfg['data_shape']
-    classes_size = cfg['classes_size'] if classes_size is None else classes_size
+    classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
     track = cfg['track']

@@ -55,10 +55,8 @@ def split_dataset(dataset, num_users, data_split_mode):
         for i in range(num_users):
             num_items_i = min(len(idx), num_items)
             data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
-            label_split[i] = label[data_split[i]].tolist()
+            label_split[i] = np.unique(label[data_split[i]]).tolist()
             idx = list(set(idx) - set(data_split[i]))
-        data_split[num_users - 1] += idx
-        label_split[num_users - 1] += label[idx].tolist()
     elif cfg['data_split_mode'] == 'non-iid':
         num_items = round(len(dataset) / num_users)
         idx_shard = [i for i in range(0, len(dataset), num_items // 2)]
@@ -69,7 +67,7 @@ def split_dataset(dataset, num_users, data_split_mode):
             pivot = np.random.choice(idx_shard, 2, replace=False)
             data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
                             idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
-            label_split[i] = label[data_split[i]].tolist()
+            label_split[i] = np.unique(label[data_split[i]]).tolist()
             idx_shard = list(set(idx_shard) - set(pivot))
     else:
         raise ValueError('Not valid data split mode')

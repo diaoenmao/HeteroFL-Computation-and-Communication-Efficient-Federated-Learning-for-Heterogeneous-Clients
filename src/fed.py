@@ -27,6 +27,7 @@ class Federation:
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
             output_weight_name = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
+            output_bias_name = [k for k in self.global_parameters.keys() if 'bias' in k][-1]
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
@@ -39,8 +40,7 @@ class Federation:
                                     idx_i[m] = torch.arange(input_size, device=v.device)
                                 input_idx_i_m = idx_i[m]
                                 if k == output_weight_name:
-                                    output_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
-                                                                  device=v.device, dtype=torch.long)
+                                    output_idx_i_m = torch.arange(output_size, device=v.device)
                                 else:
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
                                     local_output_size = int(np.ceil(output_size * scaler_rate))
@@ -51,8 +51,12 @@ class Federation:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
                         else:
-                            input_idx_i_m = idx_i[m]
-                            idx[m][k] = input_idx_i_m
+                            if k == output_bias_name:
+                                input_idx_i_m = idx_i[m]
+                                idx[m][k] = input_idx_i_m
+                            else:
+                                input_idx_i_m = idx_i[m]
+                                idx[m][k] = input_idx_i_m
                     else:
                         pass
         elif 'resnet' in cfg['model_name']:
@@ -79,8 +83,7 @@ class Federation:
                                     output_idx_i_m = idx_i[m]
                                 elif 'linear' in k:
                                     input_idx_i_m = idx_i[m]
-                                    output_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
-                                                                  device=v.device, dtype=torch.long)
+                                    output_idx_i_m = torch.arange(output_size, device=v.device)
                                 else:
                                     raise ValueError('Not valid k')
                                 idx[m][k] = (output_idx_i_m, input_idx_i_m)
@@ -88,9 +91,9 @@ class Federation:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
                         else:
+                            input_size = v.size(0)
                             if 'linear' in k:
-                                input_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
-                                                                  device=v.device, dtype=torch.long)
+                                input_idx_i_m = torch.arange(input_size, device=v.device)
                                 idx[m][k] = input_idx_i_m
                             else:
                                 input_idx_i_m = idx_i[m]
@@ -120,27 +123,81 @@ class Federation:
                     local_parameters[m][k] = copy.deepcopy(v)
         return local_parameters, param_idx
 
-    def combine(self, local_parameters, param_idx):
+    def combine(self, local_parameters, param_idx, user_idx):
         count = OrderedDict()
-        for k, v in self.global_parameters.items():
-            parameter_type = k.split('.')[-1]
-            count[k] = v.new_zeros(v.size(), dtype=torch.float32)
-            tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
-            for m in range(len(local_parameters)):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
-                    if parameter_type == 'weight':
-                        if v.dim() > 1:
-                            tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k]
-                            count[k][torch.meshgrid(param_idx[m][k])] += 1
+        if cfg['model_name'] in ['conv', 'mlp']:
+            output_weight_name = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
+            output_bias_name = [k for k in self.global_parameters.keys() if 'bias' in k][-1]
+            for k, v in self.global_parameters.items():
+                parameter_type = k.split('.')[-1]
+                count[k] = v.new_zeros(v.size(), dtype=torch.float32)
+                tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
+                for m in range(len(local_parameters)):
+                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                        if parameter_type == 'weight':
+                            if v.dim() > 1:
+                                if k == output_weight_name:
+                                    label_split = self.label_split[user_idx[m]]
+                                    param_idx[m][k] = list(param_idx[m][k])
+                                    param_idx[m][k][0] = param_idx[m][k][0][label_split]
+                                    tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k][label_split]
+                                    count[k][torch.meshgrid(param_idx[m][k])] += 1
+                                else:
+                                    tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k]
+                                    count[k][torch.meshgrid(param_idx[m][k])] += 1
+                            else:
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                                count[k][param_idx[m][k]] += 1
                         else:
-                            tmp_v[param_idx[m][k]] += local_parameters[m][k]
-                            count[k][param_idx[m][k]] += 1
+                            if k == output_bias_name:
+                                label_split = self.label_split[user_idx[m]]
+                                param_idx[m][k] = param_idx[m][k][label_split]
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k][label_split]
+                                count[k][param_idx[m][k]] += 1
+                            else:
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                                count[k][param_idx[m][k]] += 1
                     else:
-                        tmp_v[param_idx[m][k]] += local_parameters[m][k]
-                        count[k][param_idx[m][k]] += 1
-                else:
-                    tmp_v += local_parameters[m][k]
-                    count[k] += 1
-            tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
-            v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
+                        tmp_v += local_parameters[m][k]
+                        count[k] += 1
+                tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
+                v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
+        elif 'resnet' in cfg['model_name']:
+            for k, v in self.global_parameters.items():
+                parameter_type = k.split('.')[-1]
+                count[k] = v.new_zeros(v.size(), dtype=torch.float32)
+                tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
+                for m in range(len(local_parameters)):
+                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                        if parameter_type == 'weight':
+                            if v.dim() > 1:
+                                if 'linear' in k:
+                                    label_split = self.label_split[user_idx[m]]
+                                    param_idx[m][k] = list(param_idx[m][k])
+                                    param_idx[m][k][0] = param_idx[m][k][0][label_split]
+                                    tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k][label_split]
+                                    count[k][torch.meshgrid(param_idx[m][k])] += 1
+                                else:
+                                    tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k]
+                                    count[k][torch.meshgrid(param_idx[m][k])] += 1
+                            else:
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                                count[k][param_idx[m][k]] += 1
+                        else:
+                            if 'linear' in k:
+                                label_split = self.label_split[user_idx[m]]
+                                param_idx[m][k] = param_idx[m][k][label_split]
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k][label_split]
+                                count[k][param_idx[m][k]] += 1
+                            else:
+                                tmp_v[param_idx[m][k]] += local_parameters[m][k]
+                                count[k][param_idx[m][k]] += 1
+                    else:
+                        tmp_v += local_parameters[m][k]
+                        count[k] += 1
+                tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
+                v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
+        else:
+            raise ValueError('Not valid model name')
+
         return
