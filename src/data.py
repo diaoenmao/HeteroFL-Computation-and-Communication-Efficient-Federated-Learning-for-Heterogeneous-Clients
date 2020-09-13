@@ -2,6 +2,7 @@ import torch
 import datasets
 import numpy as np
 from config import cfg
+from collections import defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
@@ -47,32 +48,32 @@ def input_collate(batch):
 
 
 def split_dataset(dataset, num_users, data_split_mode):
+    label = np.array(dataset.target)
     if data_split_mode == 'iid':
         num_items = round(len(dataset) / num_users)
-        data_split, idx = {}, [i for i in range(len(dataset))]
+        data_split, label_split, idx = {}, {}, list(range(len(dataset)))
         for i in range(num_users):
             num_items_i = min(len(idx), num_items)
             data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
+            label_split[i] = label[data_split[i]].tolist()
             idx = list(set(idx) - set(data_split[i]))
-    elif data_split_mode == 'non-iid':
+        data_split[num_users - 1] += idx
+        label_split[num_users - 1] += label[idx].tolist()
+    elif cfg['data_split_mode'] == 'non-iid':
         num_items = round(len(dataset) / num_users)
         idx_shard = [i for i in range(0, len(dataset), num_items // 2)]
-        data_split, idx = {}, np.arange(0, len(dataset))
-        label = dataset.target
+        data_split, label_split, idx = {}, {}, np.arange(len(dataset))
         sorted_indices = np.argsort(label).tolist()
         idx = idx[sorted_indices]
         for i in range(num_users):
             pivot = np.random.choice(idx_shard, 2, replace=False)
             data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
                             idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
+            label_split[i] = label[data_split[i]].tolist()
             idx_shard = list(set(idx_shard) - set(pivot))
-    elif data_split_mode == 'none':
-        data_split = {}
-        for i in range(num_users):
-            data_split[i] = [i for i in range(len(dataset))]
     else:
         raise ValueError('Not valid data split mode')
-    return data_split
+    return data_split, label_split
 
 
 def make_data_loader(dataset):

@@ -15,8 +15,8 @@ def Accuracy(output, target, topk=1):
 
 def Perplexity(output, target):
     with torch.no_grad():
-        bce = F.cross_entropy(output, target)
-        perplexity = torch.exp(bce).item()
+        ce = F.cross_entropy(output, target)
+        perplexity = torch.exp(ce).item()
     return perplexity
 
 

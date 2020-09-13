@@ -6,9 +6,10 @@ from collections import OrderedDict
 
 
 class Federation:
-    def __init__(self, global_parameters, rate):
+    def __init__(self, global_parameters, rate, label_split):
         self.global_parameters = global_parameters
         self.rate = rate
+        self.label_split = label_split
         self.make_model_rate()
 
     def make_model_rate(self):
@@ -38,7 +39,8 @@ class Federation:
                                     idx_i[m] = torch.arange(input_size, device=v.device)
                                 input_idx_i_m = idx_i[m]
                                 if k == output_weight_name:
-                                    output_idx_i_m = torch.arange(output_size, device=v.device)
+                                    output_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
+                                                                  device=v.device, dtype=torch.long)
                                 else:
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
                                     local_output_size = int(np.ceil(output_size * scaler_rate))
@@ -77,7 +79,8 @@ class Federation:
                                     output_idx_i_m = idx_i[m]
                                 elif 'linear' in k:
                                     input_idx_i_m = idx_i[m]
-                                    output_idx_i_m = torch.arange(output_size, device=v.device)
+                                    output_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
+                                                                  device=v.device, dtype=torch.long)
                                 else:
                                     raise ValueError('Not valid k')
                                 idx[m][k] = (output_idx_i_m, input_idx_i_m)
@@ -85,9 +88,9 @@ class Federation:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
                         else:
-                            input_size = v.size(0)
                             if 'linear' in k:
-                                input_idx_i_m = torch.arange(input_size, device=v.device)
+                                input_idx_i_m = torch.tensor(np.unique(self.label_split[user_idx[m]]),
+                                                                  device=v.device, dtype=torch.long)
                                 idx[m][k] = input_idx_i_m
                             else:
                                 input_idx_i_m = idx_i[m]

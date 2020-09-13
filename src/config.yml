@@ -3,7 +3,7 @@
 control:
   optimizer_name: 'SGD'
   num_users: '100'
-  frac: '1'
+  frac: '0.1'
   data_split_mode: 'non-iid'
   model_split_mode: 'fix'
   model_mode: 'a1'

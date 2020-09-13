@@ -56,7 +56,6 @@ def runExperiment():
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
-    federation = Federation(global_parameters, cfg['model_rate'])
     if cfg['resume_mode'] == 1:
         last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer,
                                                                              scheduler)
@@ -68,15 +67,16 @@ def runExperiment():
         logger = Logger(logger_path)
     else:
         last_epoch = 1
-        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+        data_split, label_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     if data_split is None:
-        data_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+        data_split, label_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+    federation = Federation(global_parameters, cfg['model_rate'], label_split)
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
-        train(dataset['train'], data_split, federation, model, optimizer, logger, epoch)
+        train(dataset['train'], data_split, label_split, federation, model, optimizer, logger, epoch)
         test(data_loader['test'], model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
@@ -98,10 +98,10 @@ def runExperiment():
     return
 
 
-def train(dataset, data_split, federation, global_model, optimizer, logger, epoch):
+def train(dataset, data_split, label_split, federation, global_model, optimizer, logger, epoch):
     global_model.load_state_dict(federation.global_parameters)
     global_model.train(True)
-    local, local_parameters, user_idx, param_idx = make_local(dataset, data_split, federation)
+    local, local_parameters, user_idx, param_idx = make_local(dataset, data_split, label_split, federation)
     num_active_users = len(local)
     lr = optimizer.param_groups[0]['lr']
     start_time = time.time()
@@ -144,7 +144,7 @@ def test(data_loader, model, logger, epoch):
     return
 
 
-def make_local(dataset, data_split, federation):
+def make_local(dataset, data_split, label_split, federation):
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
     local_parameters, param_idx = federation.distribute(user_idx)
@@ -152,24 +152,34 @@ def make_local(dataset, data_split, federation):
     for m in range(num_active_users):
         model_rate_m = federation.model_rate[user_idx[m]]
         data_loader_m = make_data_loader({'train': SplitDataset(dataset, data_split[user_idx[m]])})['train']
-        local[m] = Local(model_rate_m, data_loader_m)
+        local[m] = Local(model_rate_m, data_loader_m, label_split[user_idx[m]])
     return local, local_parameters, user_idx, param_idx
 
 
 class Local:
-    def __init__(self, model_rate, data_loader):
+    def __init__(self, model_rate, data_loader, label_split):
         self.model_rate = model_rate
         self.data_loader = data_loader
+        self.label_map, self.classes_size = self.make_label_map(label_split)
+
+    def make_label_map(self, label_split):
+        unique_label_split = torch.tensor(label_split).unique()
+        classes_size = unique_label_split.size(0)
+        label_map = torch.zeros(cfg['classes_size'], dtype=torch.long)
+        label_map[unique_label_split] = torch.arange(classes_size)
+        return label_map, classes_size
 
     def train(self, local_parameters, lr, logger):
         metric = Metric()
-        model = eval('models.{}(model_rate=self.model_rate).to(cfg["device"])'.format(cfg['model_name']))
+        model = eval('models.{}(model_rate=self.model_rate, classes_size=self.classes_size).to(cfg["device"])'
+                     .format(cfg['model_name']))
         model.load_state_dict(local_parameters)
         model.train()
         optimizer = make_optimizer(model, lr)
         for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
             for i, input in enumerate(self.data_loader):
                 input = collate(input)
+                input[cfg['subset']] = self.label_map[input[cfg['subset']]]
                 input_size = input['img'].size(0)
                 input = to_device(input, cfg['device'])
                 optimizer.zero_grad()

@@ -100,9 +100,9 @@ class ResNet(nn.Module):
         return output
 
 
-def resnet18(model_rate=1):
+def resnet18(model_rate=1, classes_size=None):
     data_shape = cfg['data_shape']
-    classes_size = cfg['classes_size']
+    classes_size = cfg['classes_size'] if classes_size is None else classes_size
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
     track = cfg['track']
