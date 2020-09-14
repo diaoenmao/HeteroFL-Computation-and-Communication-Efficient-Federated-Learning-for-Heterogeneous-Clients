@@ -53,7 +53,7 @@ def runExperiment():
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)
     logger.safe(True)
-    running(data_loader['train'], model)
+    track(data_loader['train'], model)
     test(data_loader['test'], model, logger, last_epoch)
     logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
@@ -61,7 +61,7 @@ def runExperiment():
     return
 
 
-def running(data_loader, model):
+def track(data_loader, model):
     with torch.no_grad():
         model.train(True)
         for i, input in enumerate(data_loader):

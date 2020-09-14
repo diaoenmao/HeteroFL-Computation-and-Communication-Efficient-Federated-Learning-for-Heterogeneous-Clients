@@ -54,7 +54,7 @@ def runExperiment():
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)
     logger.safe(True)
-    running(dataset['train'], model)
+    track(dataset['train'], model)
     test(dataset['test'], data_split['test'], label_split, model, logger, last_epoch)
     logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
@@ -62,9 +62,9 @@ def runExperiment():
     return
 
 
-def running(dataset, model):
-    data_loader = make_data_loader({'train': dataset})['train']
+def track(dataset, model):
     with torch.no_grad():
+        data_loader = make_data_loader({'train': dataset})['train']
         model.train(True)
         for i, input in enumerate(data_loader):
             input = collate(input)
