@@ -3,10 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from .utils import init_param
+from config import cfg
+from modules import Scaler
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
-        super(PositionalEncoding, self).__init__()
+        super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         pe = torch.zeros(max_len, d_model)
@@ -22,9 +26,9 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class TransformerModel(nn.Module):
+class Transformer(nn.Module):
     def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
-        super(TransformerModel, self).__init__()
+        super().__init__()
         self.src_mask = None
         self.pos_encoder = PositionalEncoding(ninp, dropout)
         encoder_layers = TransformerEncoderLayer(ninp, nhead, nhid, dropout)
@@ -60,3 +64,14 @@ class TransformerModel(nn.Module):
         output = self.transformer_encoder(src, self.src_mask)
         output = self.decoder(output)
         return F.log_softmax(output, dim=-1)
+
+
+def transformer(model_rate=1):
+    data_shape = cfg['data_shape']
+    classes_size = cfg['classes_size']
+    hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
+    scaler_rate = model_rate / cfg['global_model_rate']
+    track = cfg['track']
+    model = ResNet(data_shape, hidden_size, Block, [1, 1, 1, 2], classes_size, scaler_rate, track)
+    model.apply(init_param)
+    return model

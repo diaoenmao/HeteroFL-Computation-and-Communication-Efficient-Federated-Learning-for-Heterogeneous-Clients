@@ -30,10 +30,14 @@ def main():
     data_split_mode = args['data_split_mode']
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpu, world_size))]
     filename = '{}_{}'.format(run, model)
-    if run == 'train' and fed:
-        script_name = [['{}_{}_fed.py'.format(run, file)]]
-    else:
+    if fed == 0:
         script_name = [['{}_{}.py'.format(run, file)]]
+    elif fed == 1:
+        script_name = [['{}_{}_fed.py'.format(run, file)]]
+    elif fed == 2:
+        script_name = [['{}_{}_local.py'.format(run, file)]]
+    else:
+        raise ValueError('Not valid fed')
     if model in ['conv']:
         data_names = [['MNIST']]
     elif model in ['resnet18']:
@@ -58,11 +62,16 @@ def main():
             for k in range(j + 1, len(model_split_mode)):
                 interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
     if fed == 0:
-        control_name = [[['SGD'], ['1'], ['1'], ['none'], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]]
+        control_name = [[['0'], ['1'], ['1'], ['none'], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]]
     elif fed == 1:
-        control_name_single = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
-        control_name_combination = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]
-        control_name_interp = [['SGD'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp]
+        control_name_single = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
+        control_name_combination = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]
+        control_name_interp = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp]
+        control_name = [control_name_single, control_name_combination, control_name_interp]
+    elif fed == 2:
+        control_name_single = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
+        control_name_combination = [['2'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]
+        control_name_interp = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp]
         control_name = [control_name_single, control_name_combination, control_name_interp]
     else:
         raise ValueError('Not valid fed')

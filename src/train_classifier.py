@@ -28,7 +28,6 @@ cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['pivot_metric'] = 'Accuracy'
 cfg['pivot'] = -float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
-cfg['track'] = False
 
 
 def main():

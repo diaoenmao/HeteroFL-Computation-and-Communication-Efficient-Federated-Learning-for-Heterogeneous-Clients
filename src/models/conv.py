@@ -36,16 +36,15 @@ class Conv(nn.Module):
             mask[input['label_split']] = 1
             out = out * mask
         output['score'] = out
-        output['loss'] = F.cross_entropy(output['score'], input['label'], reduction='mean')
+        output['loss'] = F.cross_entropy(out, input['label'], reduction='mean')
         return output
 
 
-def conv(model_rate=1):
+def conv(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['conv']['hidden_size']]
     classes_size = cfg['classes_size']
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     cfg['model'] = {}
     model = Conv(data_shape, hidden_size, classes_size, scaler_rate, track)
     model.apply(init_param)

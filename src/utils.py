@@ -112,7 +112,7 @@ def process_dataset(dataset):
 
 def process_control():
     cfg['model_split_rate'] = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
-    cfg['optimizer_name'] = cfg['control']['optimizer_name']
+    cfg['fed'] = int(cfg['control']['fed'])
     cfg['num_users'] = int(cfg['control']['num_users'])
     cfg['frac'] = float(cfg['control']['frac'])
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
@@ -146,70 +146,68 @@ def process_control():
     cfg['transformer'] = {'embedding_size': 200, 'hidden_size': 512, 'num_heads': 8, 'num_layers': 6, 'dropout': 0.1}
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
-        if cfg['optimizer_name'] == 'SGD':
-            cfg['lr'] = 1e-2
-            cfg['momentum'] = 0.9
-            cfg['weight_decay'] = 5e-4
-            cfg['scheduler_name'] = 'MultiStepLR'
-            cfg['factor'] = 0.1
-        else:
-            raise ValueError('Not valid optimizer')
+        cfg['optimizer_name'] = 'SGD'
+        cfg['lr'] = 1e-2
+        cfg['momentum'] = 0.9
+        cfg['weight_decay'] = 5e-4
+        cfg['scheduler_name'] = 'MultiStepLR'
+        cfg['factor'] = 0.1
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 200, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [100]
-        elif cfg['data_split_mode'] == 'non-iid':
+        elif 'non-iid' in cfg['data_split_mode']:
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [200]
-        else:
+        elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 200
             cfg['batch_size'] = {'train': 100, 'test': 500}
             cfg['milestones'] = [100]
+        else:
+            raise ValueError('Not valid data_split_mode')
     elif cfg['data_name'] in ['CIFAR10', 'CIFAR100']:
         cfg['data_shape'] = [3, 32, 32]
-        if cfg['optimizer_name'] == 'SGD':
-            cfg['lr'] = 1e-1
-            cfg['momentum'] = 0.9
-            cfg['weight_decay'] = 5e-4
-            cfg['scheduler_name'] = 'MultiStepLR'
-            cfg['factor'] = 0.1
-        else:
-            raise ValueError('Not valid optimizer')
+        cfg['optimizer_name'] = 'SGD'
+        cfg['lr'] = 1e-1
+        cfg['momentum'] = 0.9
+        cfg['weight_decay'] = 5e-4
+        cfg['scheduler_name'] = 'MultiStepLR'
+        cfg['factor'] = 0.1
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [150, 250]
-        elif cfg['data_split_mode'] == 'non-iid':
+        elif 'non-iid' in cfg['data_split_mode']:
             cfg['num_epochs'] = {'global': 800, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
             cfg['milestones'] = [300, 500]
-        else:
+        elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 400
             cfg['batch_size'] = {'train': 100, 'test': 500}
             cfg['milestones'] = [150, 250]
-    elif cfg['data_name'] in ['PennTreebank', 'WikiText2', 'WikiText103']:
-        if cfg['optimizer_name'] == 'Adam':
-            cfg['weight_decay'] = 0
-            cfg['scheduler_name'] = 'NoamLR'
-            cfg['warm_up'] = 4000
         else:
-            raise ValueError('Not valid optimizer')
+            raise ValueError('Not valid data_split_mode')
+    elif cfg['data_name'] in ['PennTreebank', 'WikiText2', 'WikiText103']:
+        cfg['optimizer_name'] = 'Adam'
+        cfg['weight_decay'] = 0
+        cfg['scheduler_name'] = 'NoamLR'
+        cfg['warm_up'] = 4000
+        cfg['lr'] = 1e-3
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
-            cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
-        elif cfg['data_split_mode'] == 'non-iid':
+        elif 'non-iid' in cfg['data_split_mode']:
             cfg['num_epochs'] = {'global': 400, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 50}
-            cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
-        else:
+        elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 400
             cfg['batch_size'] = {'train': 100, 'test': 500}
-            cfg['lr'] = 1e-3
             cfg['milestones'] = [150, 250]
+        else:
+            raise ValueError('Not valid data_split_mode')
     else:
         raise ValueError('Not valid dataset')
     return
@@ -305,6 +303,7 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
             last_epoch = checkpoint['epoch']
             data_split = checkpoint['data_split']
+            label_split = checkpoint['label_split']
             model.load_state_dict(checkpoint['model_dict'], strict=strict)
             if optimizer is not None:
                 optimizer.load_state_dict(checkpoint['optimizer_dict'])
@@ -319,9 +318,10 @@ def resume(model, model_tag, optimizer=None, scheduler=None, load_tag='checkpoin
             from logger import Logger
             last_epoch = 1
             data_split = None
+            label_split = None
             logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], datetime.now().strftime('%b%d_%H-%M-%S'))
             logger = Logger(logger_path)
-        return last_epoch, data_split, model, optimizer, scheduler, logger
+        return last_epoch, data_split, label_split, model, optimizer, scheduler, logger
     else:
         if os.path.exists('./output/model/{}_{}.pt'.format(model_tag, load_tag)):
             checkpoint = load('./output/model/{}_{}.pt'.format(model_tag, load_tag))
@@ -367,7 +367,6 @@ from torch.optim.lr_scheduler import _LRScheduler
 
 
 class NoamLR(_LRScheduler):
-
     def __init__(self, optimizer, hidden_size, warm_up):
         super().__init__(optimizer)
         self.hidden_size = hidden_size

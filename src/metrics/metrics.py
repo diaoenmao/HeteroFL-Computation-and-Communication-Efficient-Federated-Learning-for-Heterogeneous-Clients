@@ -23,7 +23,11 @@ def Perplexity(output, target):
 class Metric(object):
     def __init__(self):
         self.metric = {'Loss': (lambda input, output: output['loss'].item()),
+                       'Local-Loss': (lambda input, output: output['loss'].item()),
+                       'Global-Loss': (lambda input, output: output['loss'].item()),
                        'Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
+                       'Local-Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
+                       'Global-Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
                        'Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['nsymbol']))}
 
     def evaluate(self, metric_names, input, output):

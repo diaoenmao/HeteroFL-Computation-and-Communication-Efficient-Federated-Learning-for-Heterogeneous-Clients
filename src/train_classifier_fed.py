@@ -28,10 +28,10 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['pivot_metric'] = 'Accuracy'
+cfg['pivot_metric'] = 'Global-Accuracy'
 cfg['pivot'] = -float('inf')
-cfg['metric_name'] = {'train': ['Loss', 'Accuracy'], 'test': ['Loss', 'Accuracy']}
-cfg['track'] = False
+cfg['metric_name'] = {'train': {'Local': ['Local-Loss', 'Local-Accuracy']},
+                      'test': {'Local': ['Local-Loss', 'Local-Accuracy'], 'Global': ['Global-Loss', 'Global-Accuracy']}}
 
 
 def main():
@@ -51,33 +51,32 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
-    data_loader = make_data_loader(dataset)
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     global_parameters = model.state_dict()
     if cfg['resume_mode'] == 1:
-        last_epoch, data_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer,
-                                                                             scheduler)
+        last_epoch, data_split, label_split, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'],
+                                                                                          optimizer, scheduler)
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
-        _, data_split, model, _, _, _ = resume(model, cfg['model_tag'])
+        _, data_split, label_split, model, _, _, _ = resume(model, cfg['model_tag'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     else:
         last_epoch = 1
-        data_split, label_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+        data_split, label_split = split_dataset(dataset, cfg['num_users'], cfg['data_split_mode'])
         current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
         logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
         logger = Logger(logger_path)
     if data_split is None:
-        data_split, label_split = split_dataset(dataset['train'], cfg['num_users'], cfg['data_split_mode'])
+        data_split, label_split = split_dataset(dataset, cfg['num_users'], cfg['data_split_mode'])
     federation = Federation(global_parameters, cfg['model_rate'], label_split)
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
-        train(dataset['train'], data_split, label_split, federation, model, optimizer, logger, epoch)
-        test(data_loader['test'], model, logger, epoch)
+        train(dataset['train'], data_split['train'], label_split, federation, model, optimizer, logger, epoch)
+        test(dataset['test'], data_split['test'], label_split, model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
         else:
@@ -85,8 +84,8 @@ def runExperiment():
         logger.safe(False)
         model_state_dict = model.state_dict()
         save_result = {
-            'cfg': cfg, 'epoch': epoch + 1, 'data_split': data_split, 'federation': federation,
-            'model_dict': model_state_dict, 'optimizer_dict': optimizer.state_dict(),
+            'cfg': cfg, 'epoch': epoch + 1, 'data_split': data_split, 'label_split': label_split,
+            'federation': federation, 'model_dict': model_state_dict, 'optimizer_dict': optimizer.state_dict(),
             'scheduler_dict': scheduler.state_dict(), 'logger': logger}
         save(save_result, './output/model/{}_checkpoint.pt'.format(cfg['model_tag']))
         if cfg['pivot'] < logger.mean['test/{}'.format(cfg['pivot_metric'])]:
@@ -119,28 +118,40 @@ def train(dataset, data_split, label_split, federation, global_model, optimizer,
                              'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
-            logger.write('train', cfg['metric_name']['train'])
+            logger.write('train', cfg['metric_name']['train']['Local'])
     federation.combine(local_parameters, param_idx, user_idx)
     global_model.load_state_dict(federation.global_parameters)
     return
 
 
-def test(data_loader, model, logger, epoch):
+def test(dataset, data_split, label_split, model, logger, epoch):
     with torch.no_grad():
         metric = Metric()
         model.train(False)
+        for m in range(cfg['num_users']):
+            data_loader = make_data_loader({'test': SplitDataset(dataset, data_split[m])})['test']
+            for i, input in enumerate(data_loader):
+                input = collate(input)
+                input_size = input['img'].size(0)
+                input['label_split'] = torch.tensor(label_split[m])
+                input = to_device(input, cfg['device'])
+                output = model(input)
+                output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
+                evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
+                logger.append(evaluation, 'test', input_size)
+        data_loader = make_data_loader({'test': dataset})['test']
         for i, input in enumerate(data_loader):
             input = collate(input)
             input_size = input['img'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-            evaluation = metric.evaluate(cfg['metric_name']['test'], input, output)
+            evaluation = metric.evaluate(cfg['metric_name']['test']['Global'], input, output)
             logger.append(evaluation, 'test', input_size)
         info = {'info': ['Model: {}'.format(cfg['model_tag']),
                          'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test'])
+        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
     return
 
 
@@ -166,7 +177,7 @@ class Local:
         metric = Metric()
         model = eval('models.{}(model_rate=self.model_rate).to(cfg["device"])'.format(cfg['model_name']))
         model.load_state_dict(local_parameters)
-        model.train()
+        model.train(True)
         optimizer = make_optimizer(model, lr)
         for local_epoch in range(1, cfg['num_epochs']['local'] + 1):
             for i, input in enumerate(self.data_loader):
@@ -179,7 +190,7 @@ class Local:
                 output['loss'].backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 optimizer.step()
-                evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
+                evaluation = metric.evaluate(cfg['metric_name']['train']['Local'], input, output)
                 logger.append(evaluation, 'train', n=input_size)
         local_parameters = model.state_dict()
         return local_parameters

@@ -1,10 +1,10 @@
 ---
 # control
 control:
-  optimizer_name: 'SGD'
+  fed: '1'
   num_users: '100'
   frac: '0.1'
-  data_split_mode: 'non-iid'
+  data_split_mode: 'non-iid-2'
   model_split_mode: 'fix'
   model_mode: 'a1'
 # data

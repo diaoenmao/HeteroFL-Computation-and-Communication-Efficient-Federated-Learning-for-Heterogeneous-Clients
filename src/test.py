@@ -120,7 +120,8 @@ if __name__ == '__main__':
         mask = torch.zeros(10)
         mask[:c] = 1
         y = y * mask
-        loss = F.cross_entropy(y, label)
+        y = y.log_softmax(dim=-1)
+        loss = F.nll_loss(y, label)
         loss.backward()
         optimizer.step()
     norm = m.weight.abs().mean(dim=1)

@@ -48,29 +48,61 @@ def input_collate(batch):
 
 
 def split_dataset(dataset, num_users, data_split_mode):
-    label = np.array(dataset.target)
+    data_split = {}
     if data_split_mode == 'iid':
-        num_items = round(len(dataset) / num_users)
-        data_split, label_split, idx = {}, {}, list(range(len(dataset)))
-        for i in range(num_users):
-            num_items_i = min(len(idx), num_items)
-            data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
-            label_split[i] = np.unique(label[data_split[i]]).tolist()
-            idx = list(set(idx) - set(data_split[i]))
-    elif cfg['data_split_mode'] == 'non-iid':
-        num_items = round(len(dataset) / num_users)
-        idx_shard = [i for i in range(0, len(dataset), num_items // 2)]
-        data_split, label_split, idx = {}, {}, np.arange(len(dataset))
-        sorted_indices = np.argsort(label).tolist()
-        idx = idx[sorted_indices]
-        for i in range(num_users):
-            pivot = np.random.choice(idx_shard, 2, replace=False)
-            data_split[i] = idx[pivot[0]:(pivot[0] + num_items // 2)].tolist() + \
-                            idx[pivot[1]:(pivot[1] + num_items // 2)].tolist()
-            label_split[i] = np.unique(label[data_split[i]]).tolist()
-            idx_shard = list(set(idx_shard) - set(pivot))
+        data_split['train'], label_split = iid(dataset['train'], num_users)
+        data_split['test'], _ = iid(dataset['test'], num_users)
+    elif 'non-iid' in cfg['data_split_mode']:
+        data_split['train'], label_split = non_iid(dataset['train'], num_users)
+        data_split['test'], _ = non_iid(dataset['test'], num_users, label_split)
     else:
         raise ValueError('Not valid data split mode')
+    return data_split, label_split
+
+
+def iid(dataset, num_users):
+    num_items = int(len(dataset) / num_users)
+    data_split, idx = {}, list(range(len(dataset)))
+    label_split = {}
+    for i in range(num_users):
+        num_items_i = min(len(idx), num_items)
+        data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
+        label_split[i] = list(range(cfg['classes_size']))
+        idx = list(set(idx) - set(data_split[i]))
+    return data_split, label_split
+
+
+def non_iid(dataset, num_users, label_split=None):
+    label = np.array(dataset.target)
+    cfg['non-iid-n'] = int(cfg['data_split_mode'].split('-')[-1])
+    shard_per_user = cfg['non-iid-n']
+    data_split = {i: [] for i in range(num_users)}
+    label_idx_split = {}
+    for i in range(len(label)):
+        label_i = label[i].item()
+        if label_i not in label_idx_split:
+            label_idx_split[label_i] = []
+        label_idx_split[label_i].append(i)
+    shard_per_class = int(shard_per_user * num_users / cfg['classes_size'])
+    for label_i in label_idx_split:
+        label_idx = label_idx_split[label_i]
+        num_leftover = len(label_idx) % shard_per_class
+        leftover = label_idx[-num_leftover:] if num_leftover > 0 else []
+        new_label_idx = np.array(label_idx[:-num_leftover]) if num_leftover > 0 else np.array(label_idx)
+        new_label_idx = new_label_idx.reshape((shard_per_class, -1)).tolist()
+        for i, leftover_label_idx in enumerate(leftover):
+            new_label_idx[i] = np.concatenate([new_label_idx[i], [leftover_label_idx]])
+        label_idx_split[label_i] = new_label_idx
+    if label_split is None:
+        label_split = list(range(cfg['classes_size'])) * shard_per_class
+        np.random.shuffle(label_split)
+        label_split = np.array(label_split).reshape((num_users, -1)).tolist()
+        for i in range(len(label_split)):
+            label_split[i] = np.unique(label_split[i]).tolist()
+    for i in range(num_users):
+        for label_i in label_split[i]:
+            idx = np.random.choice(len(label_idx_split[label_i]), replace=False)
+            data_split[i].extend(label_idx_split[label_i].pop(idx))
     return data_split, label_split
 
 

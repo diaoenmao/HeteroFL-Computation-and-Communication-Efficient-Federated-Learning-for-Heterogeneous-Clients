@@ -104,56 +104,51 @@ class ResNet(nn.Module):
         return output
 
 
-def resnet18(model_rate=1):
+def resnet18(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     model = ResNet(data_shape, hidden_size, Block, [1, 1, 1, 2], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
 
 
-def resnet34(model_rate=1):
+def resnet34(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     model = ResNet(data_shape, hidden_size, Block, [3, 4, 6, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
 
 
-def resnet50(model_rate=1):
+def resnet50(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 6, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
 
 
-def resnet101(model_rate=1):
+def resnet101(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 23, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
 
 
-def resnet152(model_rate=1):
+def resnet152(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    track = cfg['track']
     model = ResNet(data_shape, hidden_size, Bottleneck, [3, 8, 36, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
