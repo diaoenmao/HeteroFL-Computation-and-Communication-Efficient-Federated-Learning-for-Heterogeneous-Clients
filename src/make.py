@@ -70,9 +70,8 @@ def main():
         control_name = [control_name_single, control_name_combination, control_name_interp]
     elif fed == 2:
         control_name_single = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
-        control_name_combination = [['2'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]
         control_name_interp = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp]
-        control_name = [control_name_single, control_name_combination, control_name_interp]
+        control_name = [control_name_single, control_name_interp]
     else:
         raise ValueError('Not valid fed')
     control_names = []

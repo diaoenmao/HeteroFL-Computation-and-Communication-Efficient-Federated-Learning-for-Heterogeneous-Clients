@@ -28,10 +28,10 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['pivot_metric'] = 'Global-Accuracy'
+cfg['pivot_metric'] = 'Local-Accuracy'
 cfg['pivot'] = -float('inf')
 cfg['metric_name'] = {'train': {'Local': ['Local-Loss', 'Local-Accuracy']},
-                      'test': {'Local': ['Local-Loss', 'Local-Accuracy'], 'Global': ['Global-Loss', 'Global-Accuracy']}}
+                      'test': {'Local': ['Local-Loss', 'Local-Accuracy']}}
 
 
 def main():
@@ -51,7 +51,11 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
-    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
+    federation = Federation(None, cfg['model_rate'], None)
+    model = torch.nn.ModuleList([])
+    for m in range(cfg['num_users']):
+        exec('model.append(models.{}(model_rate=federation.model_rate[m])).to("cpu")'.format(cfg['model_name']))
+    federation.global_parameters = [model[m].state_dict() for m in range(cfg['num_users'])]
     optimizer = make_optimizer(model, cfg['lr'])
     scheduler = make_scheduler(optimizer)
     if cfg['resume_mode'] == 1:
@@ -71,12 +75,10 @@ def runExperiment():
         logger = Logger(logger_path)
     if data_split is None:
         data_split, label_split = split_dataset(dataset, cfg['num_users'], cfg['data_split_mode'])
-    global_parameters = model.state_dict()
-    federation = Federation(global_parameters, cfg['model_rate'], label_split)
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
         train(dataset['train'], data_split['train'], label_split, federation, model, optimizer, logger, epoch)
-        test_model = track(dataset['train'], model)
+        test_model = track(dataset['train'], model, data_split['train'], federation)
         test(dataset['test'], data_split['test'], label_split, test_model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
@@ -98,10 +100,9 @@ def runExperiment():
     return
 
 
-def train(dataset, data_split, label_split, federation, global_model, optimizer, logger, epoch):
-    global_model.load_state_dict(federation.global_parameters)
-    global_model.train(True)
-    local, local_parameters, user_idx, param_idx = make_local(dataset, data_split, label_split, federation)
+def train(dataset, data_split, label_split, federation, model, optimizer, logger, epoch):
+    model.train(True)
+    local, local_parameters, user_idx = make_local(dataset, data_split, label_split, federation)
     num_active_users = len(local)
     lr = optimizer.param_groups[0]['lr']
     start_time = time.time()
@@ -120,22 +121,25 @@ def train(dataset, data_split, label_split, federation, global_model, optimizer,
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
             logger.write('train', cfg['metric_name']['train']['Local'])
-    federation.combine(local_parameters, param_idx, user_idx)
-    global_model.load_state_dict(federation.global_parameters)
+        federation.global_parameters[user_idx[m]] = local_parameters[m]
+        model[user_idx[m]].load_state_dict(federation.global_parameters[user_idx[m]])
     return
 
 
-def track(dataset, model):
+def track(dataset, model, data_split, federation):
     with torch.no_grad():
-        test_model = eval('models.{}(model_rate=cfg["global_model_rate"], track=True).to(cfg["device"])'
-                          .format(cfg['model_name']))
-        test_model.load_state_dict(model.state_dict(), strict=False)
-        data_loader = make_data_loader({'train': dataset})['train']
-        test_model.train(True)
-        for i, input in enumerate(data_loader):
-            input = collate(input)
-            input = to_device(input, cfg['device'])
-            test_model(input)
+        test_model = torch.nn.ModuleList([])
+        for m in range(cfg['num_users']):
+            exec('test_model.append(models.{}(model_rate=federation.model_rate[m], track=True).to(cfg["device"]))'
+                 .format(cfg['model_name']))
+            test_model[m].load_state_dict(model[m].state_dict(), strict=False)
+            data_loader = make_data_loader({'train': SplitDataset(dataset, data_split[m])})['train']
+            test_model[m].train(True)
+            for i, input in enumerate(data_loader):
+                input = collate(input)
+                input = to_device(input, cfg['device'])
+                test_model[m](input)
+            test_model[m] = test_model[m].to('cpu')
     return test_model
 
 
@@ -145,41 +149,34 @@ def test(dataset, data_split, label_split, model, logger, epoch):
         model.train(False)
         for m in range(cfg['num_users']):
             data_loader = make_data_loader({'test': SplitDataset(dataset, data_split[m])})['test']
+            model[m] = model[m].to(cfg['device'])
             for i, input in enumerate(data_loader):
                 input = collate(input)
                 input_size = input['img'].size(0)
                 input['label_split'] = torch.tensor(label_split[m])
                 input = to_device(input, cfg['device'])
-                output = model(input)
+                output = model[m](input)
                 output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
                 evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
                 logger.append(evaluation, 'test', input_size)
-        data_loader = make_data_loader({'test': dataset})['test']
-        for i, input in enumerate(data_loader):
-            input = collate(input)
-            input_size = input['img'].size(0)
-            input = to_device(input, cfg['device'])
-            output = model(input)
-            output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-            evaluation = metric.evaluate(cfg['metric_name']['test']['Global'], input, output)
-            logger.append(evaluation, 'test', input_size)
-        info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                         'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
-        logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
+            info = {'info': ['Model: {}'.format(cfg['model_tag']),
+                             'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
+            logger.append(info, 'test', mean=False)
+            model[m] = model[m].to('cpu')
+        logger.write('test', cfg['metric_name']['test']['Local'])
     return
 
 
 def make_local(dataset, data_split, label_split, federation):
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
     user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
-    local_parameters, param_idx = federation.distribute(user_idx)
+    local_parameters = [copy.deepcopy(federation.global_parameters[user_idx[m]]) for m in range(num_active_users)]
     local = [None for _ in range(num_active_users)]
     for m in range(num_active_users):
         model_rate_m = federation.model_rate[user_idx[m]]
         data_loader_m = make_data_loader({'train': SplitDataset(dataset, data_split[user_idx[m]])})['train']
         local[m] = Local(model_rate_m, data_loader_m, label_split[user_idx[m]])
-    return local, local_parameters, user_idx, param_idx
+    return local, local_parameters, user_idx
 
 
 class Local:
@@ -207,6 +204,7 @@ class Local:
                 optimizer.step()
                 evaluation = metric.evaluate(cfg['metric_name']['train']['Local'], input, output)
                 logger.append(evaluation, 'train', n=input_size)
+        model = model.to('cpu')
         local_parameters = model.state_dict()
         return local_parameters
 

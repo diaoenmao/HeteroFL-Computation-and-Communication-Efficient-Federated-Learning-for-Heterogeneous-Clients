@@ -1,7 +1,7 @@
 ---
 # control
 control:
-  fed: '1'
+  fed: '2'
   num_users: '100'
   frac: '0.1'
   data_split_mode: 'non-iid-2'
