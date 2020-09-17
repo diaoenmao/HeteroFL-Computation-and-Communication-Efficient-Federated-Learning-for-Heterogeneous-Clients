@@ -28,7 +28,6 @@ def fetch_dataset(data_name, subset):
              transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]))
     elif data_name in ['PennTreebank', 'WikiText2', 'WikiText103']:
         dataset['train'] = eval('datasets.{}(root=root, split=\'train\')'.format(data_name))
-        dataset['valid'] = eval('datasets.{}(root=root, split=\'valid\')'.format(data_name))
         dataset['test'] = eval('datasets.{}(root=root, split=\'test\')'.format(data_name))
     else:
         raise ValueError('Not valid dataset name')

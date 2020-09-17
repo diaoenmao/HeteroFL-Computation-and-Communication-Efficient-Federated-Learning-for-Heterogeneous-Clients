@@ -78,7 +78,7 @@ def runExperiment():
     for epoch in range(last_epoch, cfg['num_epochs']['global'] + 1):
         logger.safe(True)
         train(dataset['train'], data_split['train'], label_split, federation, model, optimizer, logger, epoch)
-        test_model = track(dataset['train'], model, data_split['train'], federation)
+        test_model = stats(dataset['train'], model, data_split['train'], federation)
         test(dataset['test'], data_split['test'], label_split, test_model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
@@ -126,7 +126,7 @@ def train(dataset, data_split, label_split, federation, model, optimizer, logger
     return
 
 
-def track(dataset, model, data_split, federation):
+def stats(dataset, model, data_split, federation):
     with torch.no_grad():
         test_model = torch.nn.ModuleList([])
         for m in range(cfg['num_users']):

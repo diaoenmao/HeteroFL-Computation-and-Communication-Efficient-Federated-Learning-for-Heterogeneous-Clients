@@ -7,10 +7,9 @@ import time
 import torch
 import torch.backends.cudnn as cudnn
 from config import cfg
-from data import fetch_dataset, make_data_loader
+from data import fetch_dataset
 from metrics import Metric
-from utils import save, to_device, process_control, process_dataset, make_optimizer, make_scheduler, resume, collate, \
-    batchify, make_batch
+from utils import save, to_device, process_control, process_dataset, make_optimizer, make_scheduler, resume, make_batch
 from logger import Logger
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -29,7 +28,6 @@ cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['pivot_metric'] = 'Loss'
 cfg['pivot'] = float('inf')
 cfg['metric_name'] = {'train': ['Loss', 'Perplexity'], 'test': ['Loss', 'Perplexity']}
-cfg['track'] = False
 
 
 def main():
@@ -69,12 +67,8 @@ def runExperiment():
         model = torch.nn.DataParallel(model, device_ids=list(range(cfg['world_size'])))
     for epoch in range(last_epoch, cfg['num_epochs'] + 1):
         logger.safe(True)
-        train(dataset['train'], model, optimizer, logger, epoch)
+        train(dataset['train'], model, optimizer, scheduler, logger, epoch)
         test(dataset['test'], model, logger, epoch)
-        if cfg['scheduler_name'] == 'ReduceLROnPlateau':
-            scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
-        else:
-            scheduler.step()
         logger.safe(False)
         model_state_dict = model.module.state_dict() if cfg['world_size'] > 1 else model.state_dict()
         save_result = {
@@ -91,14 +85,14 @@ def runExperiment():
     return
 
 
-def train(dataset, model, optimizer, logger, epoch):
+def train(dataset, model, optimizer, scheduler, logger, epoch):
     metric = Metric()
     model.train(True)
     start_time = time.time()
     bptt_range = range(0, dataset.size(1) - 1, cfg['bptt'])
     for i, idx in enumerate(bptt_range):
         input = make_batch(dataset, idx, cfg['bptt'])
-        input_size = input['symbol'].size(0)
+        input_size = input['label'].size(0)
         input = to_device(input, cfg['device'])
         optimizer.zero_grad()
         output = model(input)
@@ -120,6 +114,7 @@ def train(dataset, model, optimizer, logger, epoch):
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
             logger.write('train', cfg['metric_name']['train'])
+        scheduler.step()
     return
 
 
@@ -130,7 +125,7 @@ def test(dataset, model, logger, epoch):
         model.train(False)
         for i, idx in enumerate(bptt_range):
             input = make_batch(dataset, idx, cfg['bptt'])
-            input_size = input['symbol'].size(0)
+            input_size = input['label'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']

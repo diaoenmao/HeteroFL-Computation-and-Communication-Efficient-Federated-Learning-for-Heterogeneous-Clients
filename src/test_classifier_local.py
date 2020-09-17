@@ -57,7 +57,7 @@ def runExperiment():
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)
     logger.safe(True)
-    track(dataset['train'], model, data_split['train'], federation)
+    stats(dataset['train'], model, data_split['train'], federation)
     test(dataset['test'], data_split['test'], label_split, model, logger, last_epoch)
     logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
@@ -65,7 +65,7 @@ def runExperiment():
     return
 
 
-def track(dataset, model, data_split, federation):
+def stats(dataset, model, data_split, federation):
     with torch.no_grad():
         test_model = torch.nn.ModuleList([])
         for m in range(cfg['num_users']):

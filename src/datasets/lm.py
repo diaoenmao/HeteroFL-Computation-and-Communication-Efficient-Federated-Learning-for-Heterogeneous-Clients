@@ -80,8 +80,8 @@ class LanguageModeling(Dataset):
         raise NotImplementedError
 
     def __repr__(self):
-        fmt_str = 'Dataset {}\nSize: {}\nRoot: {}\nSplit: {}'.format(
-            self.__class__.__name__, self.__len__(), self.root, self.split)
+        fmt_str = 'Dataset {}\nRoot: {}\nSplit: {}'.format(
+            self.__class__.__name__, self.root, self.split)
         return fmt_str
 
 

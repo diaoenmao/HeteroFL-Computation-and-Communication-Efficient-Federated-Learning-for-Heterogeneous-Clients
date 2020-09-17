@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from data import fetch_dataset, make_data_loader
-from utils import makedir_exist_ok, to_device, process_control, process_dataset, collate
+from utils import makedir_exist_ok, to_device, process_control, process_dataset, collate, make_batch
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 cudnn.benchmark = True
@@ -23,19 +23,19 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['batch_size'] = {'train': 2, 'test': 2}
 cfg['track'] = False
 
 
 def main():
     process_control()
+    cfg['batch_size'] = {'train': 2, 'test': 2}
     runExperiment()
     return
 
 
 def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
-    process_dataset(dataset['train'])
+    process_dataset(dataset)
     data_loader = make_data_loader(dataset)
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     summary = summarize(data_loader['train'], model)
@@ -131,11 +131,20 @@ def summarize(data_loader, model):
     hooks = []
     model.train(run_mode)
     model.apply(register_hook)
-    for i, input in enumerate(data_loader):
-        input = collate(input)
-        input = to_device(input, cfg['device'])
-        model(input)
-        break
+    if cfg['data_name'] in ['MNIST', 'CIFAR10']:
+        for i, input in enumerate(data_loader):
+            input = collate(input)
+            input = to_device(input, cfg['device'])
+            model(input)
+            break
+    elif cfg['data_name'] in ['WikiText2']:
+        bptt_range = range(0, data_loader.dataset.size(1) - 1, cfg['bptt'])
+        for i, idx in enumerate(bptt_range):
+            input = make_batch(data_loader.dataset, idx, cfg['bptt'])
+            input = to_device(input, cfg['device'])
+            model(input)
+    else:
+        raise ValueError('Not valid data name')
     for h in hooks:
         h.remove()
     summary['total_num_param'] = 0

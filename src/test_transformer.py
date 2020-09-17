@@ -5,9 +5,9 @@ import torch
 import torch.backends.cudnn as cudnn
 import models
 from config import cfg
-from data import fetch_dataset, make_data_loader, SplitDataset
+from data import fetch_dataset
 from metrics import Metric
-from utils import save, to_device, process_control, process_dataset, resume, collate
+from utils import save, to_device, process_control, process_dataset, resume, make_batch
 from logger import Logger
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -23,8 +23,7 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['metric_name'] = {'train': {'Local': ['Local-Loss', 'Local-Accuracy']},
-                      'test': {'Local': ['Local-Loss', 'Local-Accuracy'], 'Global': ['Global-Loss', 'Global-Accuracy']}}
+cfg['metric_name'] = {'train': ['Loss', 'Perplexity'], 'test': ['Loss', 'Perplexity']}
 
 
 def main():
@@ -46,60 +45,36 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
     load_tag = 'best'
-    model = eval('models.{}(model_rate=cfg["global_model_rate"], track=True).to(cfg["device"]).to(cfg["device"])'
+    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                  .format(cfg['model_name']))
-    last_epoch, data_split, label_split, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag,
-                                                                 strict=False)
+    last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     logger = Logger(logger_path)
     logger.safe(True)
-    stats(dataset['train'], model)
-    test(dataset['test'], data_split['test'], label_split, model, logger, last_epoch)
+    test(dataset['test'], model, logger, last_epoch)
     logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
     return
 
 
-def stats(dataset, model):
-    with torch.no_grad():
-        data_loader = make_data_loader({'train': dataset})['train']
-        model.train(True)
-        for i, input in enumerate(data_loader):
-            input = collate(input)
-            input = to_device(input, cfg['device'])
-            model(input)
-    return
-
-
-def test(dataset, data_split, label_split, model, logger, epoch):
+def test(dataset, model, logger, epoch):
+    bptt_range = range(0, dataset.size(1) - 1, cfg['bptt'])
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        for m in range(cfg['num_users']):
-            data_loader = make_data_loader({'test': SplitDataset(dataset, data_split[m])})['test']
-            for i, input in enumerate(data_loader):
-                input = collate(input)
-                input_size = input['img'].size(0)
-                input['label_split'] = torch.tensor(label_split[m])
-                input = to_device(input, cfg['device'])
-                output = model(input)
-                output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-                evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
-                logger.append(evaluation, 'test', input_size)
-        data_loader = make_data_loader({'test': dataset})['test']
-        for i, input in enumerate(data_loader):
-            input = collate(input)
-            input_size = input['img'].size(0)
+        for i, idx in enumerate(bptt_range):
+            input = make_batch(dataset, idx, cfg['bptt'])
+            input_size = input['label'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-            evaluation = metric.evaluate(cfg['metric_name']['test']['Global'], input, output)
+            evaluation = metric.evaluate(cfg['metric_name']['test'], input, output)
             logger.append(evaluation, 'test', input_size)
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
+        logger.write('test', cfg['metric_name']['test'])
     return
 
 
