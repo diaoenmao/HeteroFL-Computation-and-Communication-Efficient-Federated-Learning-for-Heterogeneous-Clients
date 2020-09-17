@@ -3,7 +3,6 @@ import itertools
 
 parser = argparse.ArgumentParser(description='Config')
 parser.add_argument('--run', default='train', type=str)
-parser.add_argument('--file', default='classifier', type=str)
 parser.add_argument('--model', default=None, type=str)
 parser.add_argument('--fed', default=1, type=int)
 parser.add_argument('--num_gpu', default=4, type=int)
@@ -18,7 +17,6 @@ args = vars(parser.parse_args())
 
 def main():
     run = args['run']
-    file = args['file']
     model = args['model']
     fed = args['fed']
     num_gpu = args['num_gpu']
@@ -30,6 +28,17 @@ def main():
     data_split_mode = args['data_split_mode']
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpu, world_size))]
     filename = '{}_{}'.format(run, model)
+    if model in ['conv']:
+        data_names = [['MNIST']]
+        file = 'classifier'
+    elif model in ['resnet18']:
+        data_names = [['CIFAR10']]
+        file = 'classifier'
+    elif model in ['transformer']:
+        data_names = [['WikiText2']]
+        file = 'transformer'
+    else:
+        raise ValueError('Not valid model')
     if fed == 0:
         script_name = [['{}_{}.py'.format(run, file)]]
     elif fed == 1:
@@ -38,12 +47,6 @@ def main():
         script_name = [['{}_{}_local.py'.format(run, file)]]
     else:
         raise ValueError('Not valid fed')
-    if model in ['conv']:
-        data_names = [['MNIST']]
-    elif model in ['resnet18']:
-        data_names = [['CIFAR10']]
-    else:
-        raise ValueError('Not valid model')
     model_names = [[model]]
     init_seeds = [list(range(0, num_experiments, experiment_step))]
     world_size = [[world_size]]

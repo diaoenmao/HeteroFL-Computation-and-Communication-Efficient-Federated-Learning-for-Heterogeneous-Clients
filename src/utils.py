@@ -268,7 +268,7 @@ def make_optimizer(model, lr):
     return optimizer
 
 
-def make_scheduler(optimizer):
+def make_scheduler(optimizer, embedding_size=None):
     if cfg['scheduler_name'] == 'None':
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[65535])
     elif cfg['scheduler_name'] == 'StepLR':
@@ -281,7 +281,7 @@ def make_scheduler(optimizer):
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['global'],
                                                          eta_min=cfg['min_lr'])
     elif cfg['scheduler_name'] == 'NoamLR':
-        scheduler = NoamLR(optimizer, cfg['transformer']['embedding_size'], cfg['warm_up'])
+        scheduler = NoamLR(optimizer, embedding_size, cfg['warm_up'])
     elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
                                                          patience=cfg['patience'], verbose=True,

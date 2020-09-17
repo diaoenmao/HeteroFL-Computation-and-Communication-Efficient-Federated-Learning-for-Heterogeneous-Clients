@@ -109,6 +109,7 @@ class PennTreebank(LanguageModeling):
         for (url, md5) in self.file:
             filename = os.path.basename(url)
             download_url(url, self.raw_folder, filename, md5)
+            extract_file(os.path.join(self.raw_folder, filename))
         return
 
     def make_data(self):
@@ -143,6 +144,7 @@ class WikiText2(LanguageModeling):
         for (url, md5) in self.file:
             filename = os.path.basename(url)
             download_url(url, self.raw_folder, filename, md5)
+            extract_file(os.path.join(self.raw_folder, filename))
         return
 
     def make_data(self):
@@ -177,6 +179,7 @@ class WikiText103(LanguageModeling):
         for (url, md5) in self.file:
             filename = os.path.basename(url)
             download_url(url, self.raw_folder, filename, md5)
+            extract_file(os.path.join(self.raw_folder, filename))
         return
 
     def make_data(self):

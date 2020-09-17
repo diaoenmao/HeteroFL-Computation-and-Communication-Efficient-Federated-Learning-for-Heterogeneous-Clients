@@ -73,50 +73,27 @@ def summarize(data_loader, model):
             summary['module'][key]['output_size'].append(output_size)
             for name, param in module.named_parameters():
                 if param.requires_grad:
-                    if name in ['weight', 'weight_orig']:
+                    if name in ['weight', 'in_proj_weight', 'out_proj.weight']:
                         if name not in summary['module'][key]['params']:
-                            summary['module'][key]['params']['weight'] = {}
-                            summary['module'][key]['params']['weight']['size'] = list(param.size())
+                            summary['module'][key]['params'][name] = {}
+                            summary['module'][key]['params'][name]['size'] = list(param.size())
                             summary['module'][key]['coordinates'] = []
-                            summary['module'][key]['params']['weight']['mask'] = torch.zeros(
-                                summary['module'][key]['params']['weight']['size'], dtype=torch.long,
+                            summary['module'][key]['params'][name]['mask'] = torch.zeros(
+                                summary['module'][key]['params'][name]['size'], dtype=torch.long,
                                 device=cfg['device'])
-                    elif name == 'bias':
+                    elif name in ['bias', 'in_proj_bias', 'out_proj.bias']:
                         if name not in summary['module'][key]['params']:
-                            summary['module'][key]['params']['bias'] = {}
-                            summary['module'][key]['params']['bias']['size'] = list(param.size())
-                            summary['module'][key]['params']['bias']['mask'] = torch.zeros(
-                                summary['module'][key]['params']['bias']['size'], dtype=torch.long,
+                            summary['module'][key]['params'][name] = {}
+                            summary['module'][key]['params'][name]['size'] = list(param.size())
+                            summary['module'][key]['params'][name]['mask'] = torch.zeros(
+                                summary['module'][key]['params'][name]['size'], dtype=torch.long,
                                 device=cfg['device'])
                     else:
                         continue
             if len(summary['module'][key]['params']) == 0:
                 return
-            if 'weight' in summary['module'][key]['params']:
-                weight_size = summary['module'][key]['params']['weight']['size']
-                summary['module'][key]['coordinates'].append(
-                    [torch.arange(weight_size[i], device=cfg['device']) for i in range(len(weight_size))])
-            else:
-                raise ValueError('Not valid parametrized module')
             for name in summary['module'][key]['params']:
-                coordinates = summary['module'][key]['coordinates'][-1]
-                if name == 'weight':
-                    if len(coordinates) == 1:
-                        summary['module'][key]['params'][name]['mask'][coordinates[0]] += 1
-                    elif len(coordinates) >= 2:
-                        summary['module'][key]['params'][name]['mask'][
-                            coordinates[0].view(-1, 1), coordinates[1].view(1, -1),] += 1
-                    else:
-                        raise ValueError('Not valid coordinates dimension')
-                elif name == 'bias':
-                    if len(coordinates) == 1:
-                        summary['module'][key]['params'][name]['mask'] += 1
-                    elif len(coordinates) >= 2:
-                        summary['module'][key]['params'][name]['mask'] += 1
-                    else:
-                        raise ValueError('Not valid coordinates dimension')
-                else:
-                    raise ValueError('Not valid parameters type')
+                summary['module'][key]['params'][name]['mask'] += 1
             return
 
         if not isinstance(module, nn.Sequential) and not isinstance(module, nn.ModuleList) \
@@ -143,6 +120,7 @@ def summarize(data_loader, model):
             input = make_batch(data_loader.dataset, idx, cfg['bptt'])
             input = to_device(input, cfg['device'])
             model(input)
+            break
     else:
         raise ValueError('Not valid data name')
     for h in hooks:
@@ -162,7 +140,7 @@ def parse_summary(summary):
     headers = ['Module Name', 'Input Size', 'Weight Size', 'Output Size', 'Number of Parameters']
     records = []
     for key in summary['module']:
-        if 'weight' not in summary['module'][key]['params']:
+        if not summary['module'][key]['params']:
             continue
         module_name = summary['module'][key]['module_name']
         input_size = str(summary['module'][key]['input_size'])

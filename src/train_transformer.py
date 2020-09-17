@@ -49,7 +49,7 @@ def runExperiment():
     process_dataset(dataset)
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
-    scheduler = make_scheduler(optimizer)
+    scheduler = make_scheduler(optimizer, model.embedding_size)
     if cfg['resume_mode'] == 1:
         last_epoch, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer, scheduler)
     elif cfg['resume_mode'] == 2:

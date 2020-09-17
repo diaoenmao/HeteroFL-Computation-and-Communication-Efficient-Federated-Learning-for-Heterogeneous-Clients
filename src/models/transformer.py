@@ -63,7 +63,7 @@ class Transformer(nn.Module):
         encoder_layers = TransformerEncoderLayer(embedding_size, num_heads, hidden_size, dropout, rate)
         self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers)
         self.encoder = nn.Embedding(num_tokens, embedding_size)
-        self.input_size = embedding_size
+        self.embedding_size = embedding_size
         self.decoder = nn.Linear(embedding_size, num_tokens)
         self.init_weights()
 
@@ -88,11 +88,16 @@ class Transformer(nn.Module):
                 self.src_mask = mask
         else:
             self.src_mask = None
-        src = self.encoder(src) * math.sqrt(self.input_size)
+        src = self.encoder(src) * math.sqrt(self.embedding_size)
         src = self.pos_encoder(src)
         encoded = self.transformer_encoder(src, self.src_mask)
         out = self.decoder(encoded)
-        output['score'] = out.permute(1, 2, 0)
+        out = out.permute(1, 2, 0)
+        if 'label_split' in input:
+            mask = torch.zeros((cfg['num_tokens'], 1), device=out.device)
+            mask[input['label_split']] = 1
+            out = out * mask
+        output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['nlabel'])
         return output
 
