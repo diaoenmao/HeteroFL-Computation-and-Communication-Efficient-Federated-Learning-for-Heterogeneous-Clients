@@ -193,16 +193,13 @@ def process_control():
         cfg['weight_decay'] = 0
         cfg['scheduler_name'] = 'NoamLR'
         cfg['warm_up'] = 4000
-        cfg['lr'] = 1e-3
         cfg['bptt'] = 35
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 200, 'local': 5}
-            cfg['batch_size'] = {'train': 10, 'test': 20}
-            cfg['milestones'] = [150, 250]
+            cfg['batch_size'] = {'train': 10, 'test': 10}
         elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 200
-            cfg['batch_size'] = {'train': 100, 'test': 200}
-            cfg['milestones'] = [150, 250]
+            cfg['batch_size'] = {'train': 100, 'test': 100}
         else:
             raise ValueError('Not valid data_split_mode')
     else:
@@ -372,5 +369,5 @@ class NoamLR(_LRScheduler):
 
     def get_lr(self):
         last_epoch = max(1, self.last_epoch)
-        scale = self.embedding_size ** (-0.5) * min(last_epoch ** (-0.5), last_epoch * self.warm_up ** (-1.5))
-        return [base_lr * scale for base_lr in self.base_lrs]
+        base_lr = self.embedding_size ** (-0.5) * min(last_epoch ** (-0.5), last_epoch * self.warm_up ** (-1.5))
+        return [base_lr for _ in self.base_lrs]
