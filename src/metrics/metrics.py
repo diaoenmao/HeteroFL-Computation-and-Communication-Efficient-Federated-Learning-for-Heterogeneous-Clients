@@ -28,9 +28,9 @@ class Metric(object):
                        'Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
                        'Local-Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
                        'Global-Accuracy': (lambda input, output: recur(Accuracy, output['score'], input['label'])),
-                       'Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['nlabel'])),
-                       'Local-Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['nlabel'])),
-                       'Global-Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['nlabel']))}
+                       'Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['label'])),
+                       'Local-Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['label'])),
+                       'Global-Perplexity': (lambda input, output: recur(Perplexity, output['score'], input['label']))}
 
     def evaluate(self, metric_names, input, output):
         evaluation = {}

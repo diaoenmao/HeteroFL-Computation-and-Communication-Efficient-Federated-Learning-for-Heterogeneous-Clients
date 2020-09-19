@@ -9,9 +9,9 @@ from modules import Scaler
 
 
 class PositionalEmbedding(nn.Module):
-    def __init__(self, embedding_size, max_length=5000):
+    def __init__(self, embedding_size):
         super().__init__()
-        self.positional_embedding = nn.Embedding(max_length, embedding_size)
+        self.positional_embedding = nn.Embedding(cfg['bptt'], embedding_size)
 
     def forward(self, x):
         S, N = x.size()
@@ -85,6 +85,7 @@ class Decoder(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, num_tokens, embedding_size, num_heads, hidden_size, num_layers, dropout, rate):
         super().__init__()
+        self.num_tokens = num_tokens
         self.transformer_embedding = TransformerEmbedding(num_tokens, embedding_size, dropout)
         encoder_layers = TransformerEncoderLayer(embedding_size, num_heads, hidden_size, dropout, rate)
         self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers)
@@ -92,7 +93,12 @@ class Transformer(nn.Module):
 
     def forward(self, input):
         output = {}
-        src = input['label'].transpose(0, 1)
+        src = input['label'].clone().transpose(0, 1)
+        S, N = src.size()
+        d = torch.distributions.bernoulli.Bernoulli(probs=cfg['mask_rate'])
+        mask = d.sample((S, N))
+        src[mask == 1] = self.num_tokens
+        src = src.detach()
         src = self.transformer_embedding(src)
         src = self.transformer_encoder(src)
         out = self.decoder(src)
