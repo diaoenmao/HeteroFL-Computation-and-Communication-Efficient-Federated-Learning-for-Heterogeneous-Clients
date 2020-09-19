@@ -25,9 +25,9 @@ def main():
     experiment_step = args['experiment_step']
     num_experiments = args['num_experiments']
     resume_mode = args['resume_mode']
-    data_split_mode = args['data_split_mode']
+    data_split_mode = args['data_split_mode'] if fed != 0 else 'none'
     gpu_ids = [','.join(str(i) for i in list(range(x, x + world_size))) for x in list(range(0, num_gpu, world_size))]
-    filename = '{}_{}'.format(run, model)
+    filename = '{}_{}_{}'.format(run, model, data_split_mode)
     if model in ['conv']:
         data_names = [['MNIST']]
         file = 'classifier'
@@ -65,7 +65,7 @@ def main():
             for k in range(j + 1, len(model_split_mode)):
                 interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
     if fed == 0:
-        control_name = [[['0'], ['1'], ['1'], ['none'], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]]
+        control_name = [[['0'], ['1'], ['1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]]
     elif fed == 1:
         control_name_single = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1']]
         control_name_combination = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination]

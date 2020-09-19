@@ -24,17 +24,17 @@ class Vocab:
         return
 
     def __len__(self):
-        return len(self.index_to_symbol) + 1
+        return len(self.index_to_symbol)
 
     def __getitem__(self, input):
         if isinstance(input, int):
-            if input == len(self.index_to_symbol):
-                output = '<ukn>'
-            else:
+            if input < len(self.index_to_symbol):
                 output = self.index_to_symbol[input]
-        elif isinstance(input, str):
-            if input not in self.symbol_to_index:
+            else:
                 output = '<ukn>'
+        elif isinstance(input, str):
+            if input not in self.symbol_to_index or input == '<ukn>':
+                output = len(self.index_to_symbol)
             else:
                 output = self.symbol_to_index[input]
         else:

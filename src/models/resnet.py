@@ -1,9 +1,3 @@
-'''Pre-activation ResNet in PyTorch.
-
-Reference:
-[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
-    Identity Mappings in Deep Residual Networks. arXiv:1603.05027
-'''
 import numpy as np
 import torch
 import torch.nn as nn
@@ -96,9 +90,9 @@ class ResNet(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         if 'label_split' in input:
-            mask = torch.zeros(cfg['classes_size'], device=out.device)
-            mask[input['label_split']] = 1
-            out = out * mask
+            label_mask = torch.zeros(cfg['classes_size'], device=out.device)
+            label_mask[input['label_split']] = 1
+            out = out * label_mask
         output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['label'])
         return output
@@ -108,7 +102,7 @@ def resnet18(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
-    scaler_rate = model_rate / cfg['global_model_rate']
+    scaler_rate = model_rate / cfg['global_model_rate'] if cfg['fed'] != 2 else 1
     model = ResNet(data_shape, hidden_size, Block, [1, 1, 1, 2], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
@@ -118,7 +112,7 @@ def resnet34(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
-    scaler_rate = model_rate / cfg['global_model_rate']
+    scaler_rate = model_rate / cfg['global_model_rate'] if cfg['fed'] != 2 else 1
     model = ResNet(data_shape, hidden_size, Block, [3, 4, 6, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
@@ -138,7 +132,7 @@ def resnet101(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
-    scaler_rate = model_rate / cfg['global_model_rate']
+    scaler_rate = model_rate / cfg['global_model_rate'] if cfg['fed'] != 2 else 1
     model = ResNet(data_shape, hidden_size, Bottleneck, [3, 4, 23, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
@@ -148,7 +142,7 @@ def resnet152(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
-    scaler_rate = model_rate / cfg['global_model_rate']
+    scaler_rate = model_rate / cfg['global_model_rate'] if cfg['fed'] != 2 else 1
     model = ResNet(data_shape, hidden_size, Bottleneck, [3, 8, 36, 3], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model

@@ -2,6 +2,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from torch.utils.tensorboard import SummaryWriter
 from numbers import Number
+from utils import ntuple
 
 
 class Logger():
@@ -35,16 +36,20 @@ class Logger():
         for k in result:
             name = '{}/{}'.format(tag, k)
             self.tracker[name] = result[k]
-            self.counter[name] += n
             if mean:
                 if isinstance(result[k], Number):
+                    self.counter[name] += n
                     self.mean[name] = ((self.counter[name] - n) * self.mean[name] + n * result[k]) / self.counter[name]
                 elif isinstance(result[k], Iterable):
                     if name not in self.mean:
+                        self.counter[name] = [0 for _ in range(len(result[k]))]
                         self.mean[name] = [0 for _ in range(len(result[k]))]
+                    _ntuple = ntuple(len(result[k]))
+                    n = _ntuple(n)
                     for i in range(len(result[k])):
-                        self.mean[name][i] = ((self.counter[name] - n) * self.mean[name][i] + n * result[k][i]) \
-                                             / self.counter[name]
+                        self.counter[name][i] += n[i]
+                        self.mean[name][i] = ((self.counter[name][i] - n[i]) * self.mean[name][i] + n[i] *
+                                              result[k][i]) / self.counter[name][i]
                 else:
                     raise ValueError('Not valid data type')
         return

@@ -49,7 +49,7 @@ def runExperiment():
     process_dataset(dataset)
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"])'.format(cfg['model_name']))
     optimizer = make_optimizer(model, cfg['lr'])
-    scheduler = make_scheduler(optimizer, model.embedding_size)
+    scheduler = make_scheduler(optimizer)
     if cfg['resume_mode'] == 1:
         last_epoch, model, optimizer, scheduler, logger = resume(model, cfg['model_tag'], optimizer, scheduler)
     elif cfg['resume_mode'] == 2:
@@ -67,8 +67,12 @@ def runExperiment():
         model = torch.nn.DataParallel(model, device_ids=list(range(cfg['world_size'])))
     for epoch in range(last_epoch, cfg['num_epochs'] + 1):
         logger.safe(True)
-        train(dataset['train'], model, optimizer, scheduler, logger, epoch)
+        train(dataset['train'], model, optimizer, logger, epoch)
         test(dataset['test'], model, logger, epoch)
+        if cfg['scheduler_name'] == 'ReduceLROnPlateau':
+            scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
+        else:
+            scheduler.step()
         logger.safe(False)
         model_state_dict = model.module.state_dict() if cfg['world_size'] > 1 else model.state_dict()
         save_result = {
@@ -85,7 +89,7 @@ def runExperiment():
     return
 
 
-def train(dataset, model, optimizer, scheduler, logger, epoch):
+def train(dataset, model, optimizer, logger, epoch):
     metric = Metric()
     model.train(True)
     start_time = time.time()
@@ -114,7 +118,6 @@ def train(dataset, model, optimizer, scheduler, logger, epoch):
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
             logger.write('train', cfg['metric_name']['train'])
-        scheduler.step()
     return
 
 

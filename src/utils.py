@@ -143,7 +143,7 @@ def process_control():
         raise ValueError('Not valid model split mode')
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
-    cfg['transformer'] = {'embedding_size': 256, 'num_heads': 8, 'hidden_size': 512, 'num_layers': 6, 'dropout': 0.2}
+    cfg['transformer'] = {'embedding_size': 256, 'num_heads': 8, 'hidden_size': 512, 'num_layers': 4, 'dropout': 0.1}
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
         cfg['optimizer_name'] = 'SGD'
@@ -189,17 +189,22 @@ def process_control():
         else:
             raise ValueError('Not valid data_split_mode')
     elif cfg['data_name'] in ['PennTreebank', 'WikiText2', 'WikiText103']:
-        cfg['optimizer_name'] = 'Adam'
-        cfg['weight_decay'] = 0
-        cfg['scheduler_name'] = 'NoamLR'
-        cfg['warm_up'] = 4000
-        cfg['bptt'] = 35
+        cfg['optimizer_name'] = 'SGD'
+        cfg['lr'] = 1e-1
+        cfg['weight_decay'] = 5e-4
+        cfg['scheduler_name'] = 'MultiStepLR'
+        cfg['step_size'] = 1
+        cfg['factor'] = 0.1
+        cfg['bptt'] = 128
+        cfg['mask_rate'] = 0.15
         if cfg['data_split_mode'] == 'iid':
-            cfg['num_epochs'] = {'global': 200, 'local': 5}
+            cfg['num_epochs'] = {'global': 150, 'local': 5}
             cfg['batch_size'] = {'train': 10, 'test': 10}
+            cfg['milestones'] = [50, 100]
         elif cfg['data_split_mode'] == 'none':
-            cfg['num_epochs'] = 200
+            cfg['num_epochs'] = 150
             cfg['batch_size'] = {'train': 100, 'test': 100}
+            cfg['milestones'] = [50, 100]
         else:
             raise ValueError('Not valid data_split_mode')
     else:
@@ -265,7 +270,7 @@ def make_optimizer(model, lr):
     return optimizer
 
 
-def make_scheduler(optimizer, embedding_size=None):
+def make_scheduler(optimizer):
     if cfg['scheduler_name'] == 'None':
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[65535])
     elif cfg['scheduler_name'] == 'StepLR':
@@ -277,8 +282,6 @@ def make_scheduler(optimizer, embedding_size=None):
     elif cfg['scheduler_name'] == 'CosineAnnealingLR':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg['num_epochs']['global'],
                                                          eta_min=cfg['min_lr'])
-    elif cfg['scheduler_name'] == 'NoamLR':
-        scheduler = NoamLR(optimizer, embedding_size, cfg['warm_up'])
     elif cfg['scheduler_name'] == 'ReduceLROnPlateau':
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=cfg['factor'],
                                                          patience=cfg['patience'], verbose=True,
@@ -353,21 +356,5 @@ def batchify(data, batch_size):
 
 def make_batch(data, i, seq_len):
     seq_len = min(seq_len, data.size(1) - 1 - i)
-    input = {cfg['subset']: data[:, i:i + seq_len], 'n{}'.format(cfg['subset']): data[:, i + 1:i + 1 + seq_len]}
+    input = {cfg['subset']: data[:, i:i + seq_len]}
     return input
-
-
-from torch.optim.lr_scheduler import _LRScheduler
-
-
-class NoamLR(_LRScheduler):
-    def __init__(self, optimizer, embedding_size, warm_up):
-        self.embedding_size = embedding_size
-        self.warm_up = warm_up
-        super().__init__(optimizer)
-
-
-    def get_lr(self):
-        last_epoch = max(1, self.last_epoch)
-        base_lr = self.embedding_size ** (-0.5) * min(last_epoch ** (-0.5), last_epoch * self.warm_up ** (-1.5))
-        return [base_lr for _ in self.base_lrs]
