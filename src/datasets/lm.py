@@ -60,6 +60,13 @@ class LanguageModeling(Dataset):
         self.token = load(os.path.join(self.processed_folder, '{}.pt'.format(split)))
         self.vocab = load(os.path.join(self.processed_folder, 'meta.pt'.format(split)))
 
+    def __getitem__(self, index):
+        input = {'label': self.token[index]}
+        return input
+
+    def __len__(self):
+        return len(self.token)
+
     @property
     def processed_folder(self):
         return os.path.join(self.root, 'processed')

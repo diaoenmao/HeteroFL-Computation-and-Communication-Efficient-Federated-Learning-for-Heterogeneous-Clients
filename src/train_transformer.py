@@ -7,9 +7,9 @@ import time
 import torch
 import torch.backends.cudnn as cudnn
 from config import cfg
-from data import fetch_dataset
+from data import fetch_dataset, BatchDataset
 from metrics import Metric
-from utils import save, to_device, process_control, process_dataset, make_optimizer, make_scheduler, resume, make_batch
+from utils import save, to_device, process_control, process_dataset, make_optimizer, make_scheduler, resume
 from logger import Logger
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -93,9 +93,8 @@ def train(dataset, model, optimizer, logger, epoch):
     metric = Metric()
     model.train(True)
     start_time = time.time()
-    bptt_range = range(0, dataset.size(1) - 1, cfg['bptt'])
-    for i, idx in enumerate(bptt_range):
-        input = make_batch(dataset, idx, cfg['bptt'])
+    dataset = BatchDataset(dataset, cfg['bptt'])
+    for i, input in enumerate(dataset):
         input_size = input['label'].size(0)
         input = to_device(input, cfg['device'])
         optimizer.zero_grad()
@@ -106,14 +105,14 @@ def train(dataset, model, optimizer, logger, epoch):
         optimizer.step()
         evaluation = metric.evaluate(cfg['metric_name']['train'], input, output)
         logger.append(evaluation, 'train', n=input_size)
-        if i % int((len(bptt_range) * cfg['log_interval']) + 1) == 0:
+        if i % int((len(dataset) * cfg['log_interval']) + 1) == 0:
             batch_time = (time.time() - start_time) / (i + 1)
             lr = optimizer.param_groups[0]['lr']
-            epoch_finished_time = datetime.timedelta(seconds=round(batch_time * (len(bptt_range) - i - 1)))
+            epoch_finished_time = datetime.timedelta(seconds=round(batch_time * (len(dataset) - i - 1)))
             exp_finished_time = epoch_finished_time + datetime.timedelta(
-                seconds=round((cfg['num_epochs'] - epoch) * batch_time * len(bptt_range)))
+                seconds=round((cfg['num_epochs'] - epoch) * batch_time * len(dataset)))
             info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                             'Train Epoch: {}({:.0f}%)'.format(epoch, 100. * i / len(bptt_range)),
+                             'Train Epoch: {}({:.0f}%)'.format(epoch, 100. * i / len(dataset)),
                              'Learning rate: {}'.format(lr), 'Epoch Finished Time: {}'.format(epoch_finished_time),
                              'Experiment Finished Time: {}'.format(exp_finished_time)]}
             logger.append(info, 'train', mean=False)
@@ -122,12 +121,11 @@ def train(dataset, model, optimizer, logger, epoch):
 
 
 def test(dataset, model, logger, epoch):
-    bptt_range = range(0, dataset.size(1) - 1, cfg['bptt'])
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        for i, idx in enumerate(bptt_range):
-            input = make_batch(dataset, idx, cfg['bptt'])
+        dataset = BatchDataset(dataset, cfg['bptt'])
+        for i, input in enumerate(dataset):
             input_size = input['label'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)

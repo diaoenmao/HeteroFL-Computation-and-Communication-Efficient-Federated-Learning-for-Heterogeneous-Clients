@@ -126,3 +126,20 @@ class SplitDataset(Dataset):
     def __getitem__(self, index):
         input = self.dataset[self.idx[index]]
         return input
+
+
+class BatchDataset(Dataset):
+    def __init__(self, dataset, seq_length):
+        super().__init__()
+        self.dataset = dataset
+        self.seq_length = seq_length
+        self.S = dataset[0]['label'].size(0)
+        self.idx = list(range(0, self.S - 1, seq_length))
+
+    def __len__(self):
+        return len(self.idx)
+
+    def __getitem__(self, index):
+        seq_length = min(self.seq_length, self.S - 1 - index)
+        input = {'label': self.dataset[:]['label'][:, self.idx[index]:self.idx[index] + seq_length]}
+        return input

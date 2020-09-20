@@ -5,7 +5,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import models
 from config import cfg
-from data import fetch_dataset, BatchDataset
+from data import fetch_dataset, SplitDataset, BatchDataset
 from metrics import Metric
 from utils import save, to_device, process_control, process_dataset, resume
 from logger import Logger
@@ -23,7 +23,9 @@ if args['control_name']:
     cfg['control'] = {k: v for k, v in zip(cfg['control'].keys(), args['control_name'].split('_'))} \
         if args['control_name'] != 'None' else {}
 cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
-cfg['metric_name'] = {'train': ['Loss', 'Perplexity'], 'test': ['Loss', 'Perplexity']}
+cfg['metric_name'] = {'train': {'Local': ['Local-Loss', 'Local-Perplexity']},
+                      'test': {'Local': ['Local-Loss', 'Local-Perplexity'],
+                               'Global': ['Global-Loss', 'Global-Perplexity']}}
 
 
 def main():
@@ -45,35 +47,46 @@ def runExperiment():
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
     load_tag = 'best'
-    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
+    model = eval('models.{}(model_rate=cfg["global_model_rate"], track=True).to(cfg["device"]).to(cfg["device"])'
                  .format(cfg['model_name']))
-    last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
+    last_epoch, data_split, label_split, model, _, _, train_logger = resume(model, cfg['model_tag'], load_tag=load_tag,
+                                                                            strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
-    logger = Logger(logger_path)
-    logger.safe(True)
-    test(dataset['test'], model, logger, last_epoch)
-    logger.safe(False)
-    save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
+    test_logger = Logger(logger_path)
+    test_logger.safe(True)
+    test(dataset['test'], data_split['test'], label_split, model, test_logger, last_epoch)
+    test_logger.safe(False)
+    save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': {'train': train_logger, 'test': test_logger}}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
     return
 
 
-def test(dataset, model, logger, epoch):
+def test(dataset, data_split, label_split, model, logger, epoch):
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        dataset = BatchDataset(dataset, cfg['bptt'])
-        for i, input in enumerate(dataset):
-            input_size = input['label'].size(0)
+        for m in range(cfg['num_users']):
+            batch_dataset = BatchDataset(SplitDataset(dataset, data_split[m]), cfg['bptt'])
+            for i, input in enumerate(batch_dataset):
+                input_size = input['img'].size(0)
+                input['label_split'] = torch.tensor(label_split[m])
+                input = to_device(input, cfg['device'])
+                output = model(input)
+                output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
+                evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
+                logger.append(evaluation, 'test', input_size)
+        batch_dataset = BatchDataset(dataset, cfg['bptt'])
+        for i, input in enumerate(batch_dataset):
+            input_size = input['img'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-            evaluation = metric.evaluate(cfg['metric_name']['test'], input, output)
+            evaluation = metric.evaluate(cfg['metric_name']['test']['Global'], input, output)
             logger.append(evaluation, 'test', input_size)
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test'])
+        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
     return
 
 

@@ -104,7 +104,7 @@ def process_dataset(dataset):
         cfg['vocab'] = dataset['train'].vocab
         cfg['num_tokens'] = len(dataset['train'].vocab)
         for split in dataset:
-            dataset[split] = batchify(dataset[split].token, cfg['batch_size'][split])
+            dataset[split] = batchify(dataset[split], cfg['batch_size'][split])
     else:
         raise ValueError('Not valid data name')
     return
@@ -347,14 +347,8 @@ def collate(input):
     return input
 
 
-def batchify(data, batch_size):
-    num_batch = data.size(0) // batch_size
-    data = data.narrow(0, 0, num_batch * batch_size)
-    data = data.reshape(batch_size, -1)
-    return data
-
-
-def make_batch(data, i, seq_len):
-    seq_len = min(seq_len, data.size(1) - 1 - i)
-    input = {cfg['subset']: data[:, i:i + seq_len]}
-    return input
+def batchify(dataset, batch_size):
+    num_batch = len(dataset) // batch_size
+    dataset.token = dataset.token.narrow(0, 0, num_batch * batch_size)
+    dataset.token = dataset.token.reshape(batch_size, -1)
+    return dataset

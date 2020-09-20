@@ -63,6 +63,7 @@ class Federation:
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
             for k, v in self.global_parameters.items():
+                print(k)
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
                     if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
@@ -100,6 +101,7 @@ class Federation:
                                 idx[m][k] = input_idx_i_m
                     else:
                         pass
+            exit()
         elif cfg['model_name']  == 'transformer':
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
