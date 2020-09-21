@@ -195,15 +195,15 @@ def process_control():
         cfg['weight_decay'] = 5e-4
         cfg['scheduler_name'] = 'MultiStepLR'
         cfg['factor'] = 0.1
-        cfg['bptt'] = 128
+        cfg['bptt'] = 100
         cfg['mask_rate'] = 0.15
         if cfg['data_split_mode'] == 'iid':
             cfg['num_epochs'] = {'global': 100, 'local': 5}
-            cfg['batch_size'] = {'train': 5, 'test': 5}
+            cfg['batch_size'] = {'train': 100, 'test': 100}
             cfg['milestones'] = [25, 50]
         elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 100
-            cfg['batch_size'] = {'train': 50, 'test': 50}
+            cfg['batch_size'] = {'train': 100, 'test': 100}
             cfg['milestones'] = [25, 50]
         else:
             raise ValueError('Not valid data_split_mode')

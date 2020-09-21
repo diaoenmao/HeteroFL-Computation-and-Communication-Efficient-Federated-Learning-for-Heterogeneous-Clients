@@ -59,14 +59,19 @@ def split_dataset(dataset, num_users, data_split_mode):
 
 
 def iid(dataset, num_users):
-    label = np.array(dataset.target)
+    if cfg['data_name'] in ['MNIST', 'CIFAR10']:
+        label = torch.tensor(dataset.target)
+    elif cfg['data_name'] in ['WikiText2']:
+        label = dataset.token
+    else:
+        raise ValueError('Not valid data name')
     num_items = int(len(dataset) / num_users)
     data_split, idx = {}, list(range(len(dataset)))
     label_split = {}
     for i in range(num_users):
         num_items_i = min(len(idx), num_items)
         data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
-        label_split[i] = np.unique(label[data_split[i]]).tolist()
+        label_split[i] = torch.unique(label[data_split[i]]).tolist()
         idx = list(set(idx) - set(data_split[i]))
     return data_split, label_split
 

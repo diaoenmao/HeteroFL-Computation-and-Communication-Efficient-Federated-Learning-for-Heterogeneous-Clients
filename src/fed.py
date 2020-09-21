@@ -23,7 +23,7 @@ class Federation:
         return
 
     def split_model(self, user_idx):
-        if cfg['model_name']  == 'conv':
+        if cfg['model_name'] == 'conv':
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
             output_weight_name = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
@@ -31,7 +31,7 @@ class Federation:
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 input_size = v.size(1)
@@ -63,10 +63,9 @@ class Federation:
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
             for k, v in self.global_parameters.items():
-                print(k)
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 input_size = v.size(1)
@@ -101,38 +100,54 @@ class Federation:
                                 idx[m][k] = input_idx_i_m
                     else:
                         pass
-            exit()
-        elif cfg['model_name']  == 'transformer':
+        elif cfg['model_name'] == 'transformer':
             idx_i = [None for _ in range(len(user_idx))]
             idx = [OrderedDict() for _ in range(len(user_idx))]
-            output_weight_name = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
-            output_bias_name = [k for k in self.global_parameters.keys() if 'bias' in k][-1]
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 for m in range(len(user_idx)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
-                        if parameter_type == 'weight':
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
+                        if 'weight' in parameter_type:
                             if v.dim() > 1:
                                 input_size = v.size(1)
                                 output_size = v.size(0)
-                                if idx_i[m] is None:
-                                    idx_i[m] = torch.arange(input_size, device=v.device)
-                                input_idx_i_m = idx_i[m]
-                                if k == output_weight_name:
+                                if 'embedding' in k.split('.')[-2]:
                                     output_idx_i_m = torch.arange(output_size, device=v.device)
+                                    scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
+                                    local_input_size = int(np.ceil(input_size * scaler_rate))
+                                    input_idx_i_m = torch.arange(input_size, device=v.device)[:local_input_size]
+                                    idx_i[m] = input_idx_i_m
+                                elif 'decoder' in k and 'linear2' in k:
+                                    input_idx_i_m = idx_i[m]
+                                    output_idx_i_m = torch.arange(output_size, device=v.device)
+                                elif 'in_proj' in k:
+                                    input_idx_i_m = idx_i[m]
+                                    scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
+                                    local_output_size = int(np.ceil(output_size // 3 * scaler_rate))
+                                    output_idx_i_m = (torch.arange(output_size, device=v.device)
+                                                      .reshape(3, output_size // 3))[:, :local_output_size].reshape(-1)
+                                    idx_i[m] = output_idx_i_m
                                 else:
+                                    input_idx_i_m = idx_i[m]
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
                                     local_output_size = int(np.ceil(output_size * scaler_rate))
                                     output_idx_i_m = torch.arange(output_size, device=v.device)[:local_output_size]
-                                idx[m][k] = output_idx_i_m, input_idx_i_m
-                                idx_i[m] = output_idx_i_m
+                                    idx_i[m] = output_idx_i_m
+                                idx[m][k] = (output_idx_i_m, input_idx_i_m)
                             else:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
                         else:
-                            if k == output_bias_name:
+                            input_size = v.size(0)
+                            if 'decoder' in k and 'linear2' in k:
+                                input_idx_i_m = torch.arange(input_size, device=v.device)
+                                idx[m][k] = input_idx_i_m
+                            elif 'in_proj' in k:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
+                                scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
+                                local_input_size = int(np.ceil(input_size // 3 * scaler_rate))
+                                idx_i[m] = torch.arange(input_size // 3, device=v.device)[:local_input_size]
                             else:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
@@ -149,8 +164,8 @@ class Federation:
         for k, v in self.global_parameters.items():
             parameter_type = k.split('.')[-1]
             for m in range(len(user_idx)):
-                if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
-                    if parameter_type == 'weight':
+                if 'weight' in parameter_type or 'bias' in parameter_type:
+                    if 'weight' in parameter_type:
                         if v.dim() > 1:
                             local_parameters[m][k] = copy.deepcopy(v[torch.meshgrid(param_idx[m][k])])
                         else:
@@ -171,7 +186,7 @@ class Federation:
                 count[k] = v.new_zeros(v.size(), dtype=torch.float32)
                 tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
                 for m in range(len(local_parameters)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 if k == output_weight_name:
@@ -206,7 +221,7 @@ class Federation:
                 count[k] = v.new_zeros(v.size(), dtype=torch.float32)
                 tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
                 for m in range(len(local_parameters)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
                                 if 'linear' in k:
@@ -236,17 +251,15 @@ class Federation:
                 tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
                 v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
         elif cfg['model_name'] == 'tranformer':
-            output_weight_name = [k for k in self.global_parameters.keys() if 'weight' in k][-1]
-            output_bias_name = [k for k in self.global_parameters.keys() if 'bias' in k][-1]
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 count[k] = v.new_zeros(v.size(), dtype=torch.float32)
                 tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
                 for m in range(len(local_parameters)):
-                    if parameter_type in ['weight', 'bias', 'running_mean', 'running_var']:
+                    if 'weight' in parameter_type or 'bias' in parameter_type:
                         if parameter_type == 'weight':
                             if v.dim() > 1:
-                                if k == output_weight_name:
+                                if 'decoder' in k and 'linear2' in k:
                                     label_split = self.label_split[user_idx[m]]
                                     param_idx[m][k] = list(param_idx[m][k])
                                     param_idx[m][k][0] = param_idx[m][k][0][label_split]
@@ -259,7 +272,7 @@ class Federation:
                                 tmp_v[param_idx[m][k]] += local_parameters[m][k]
                                 count[k][param_idx[m][k]] += 1
                         else:
-                            if k == output_bias_name:
+                            if 'decoder' in k and 'linear2' in k:
                                 label_split = self.label_split[user_idx[m]]
                                 param_idx[m][k] = param_idx[m][k][label_split]
                                 tmp_v[param_idx[m][k]] += local_parameters[m][k][label_split]

@@ -8,8 +8,8 @@ from .utils import download_url, extract_file
 
 class Vocab:
     def __init__(self):
-        self.symbol_to_index = {}
-        self.index_to_symbol = []
+        self.symbol_to_index = {u'<ukn>': 0, u'<eos>': 1}
+        self.index_to_symbol = [u'<ukn>', u'<eos>']
 
     def add(self, symbol):
         if symbol not in self.symbol_to_index:
@@ -28,13 +28,13 @@ class Vocab:
 
     def __getitem__(self, input):
         if isinstance(input, int):
-            if input < len(self.index_to_symbol):
+            if len(self.index_to_symbol) > input >= 0:
                 output = self.index_to_symbol[input]
             else:
-                output = '<ukn>'
+                output = u'<ukn>'
         elif isinstance(input, str):
-            if input not in self.symbol_to_index or input == '<ukn>':
-                output = len(self.index_to_symbol)
+            if input not in self.symbol_to_index:
+                output = self.symbol_to_index[u'<ukn>']
             else:
                 output = self.symbol_to_index[input]
         else:
@@ -43,7 +43,7 @@ class Vocab:
 
     def __contains__(self, input):
         if isinstance(input, int):
-            exist = input in self.index_to_symbol
+            exist = len(self.index_to_symbol) > input >= 0
         elif isinstance(input, str):
             exist = input in self.symbol_to_index
         else:
@@ -214,6 +214,6 @@ def make_token(vocab, token_path):
         for line in f:
             line = line.split() + [u'<eos>']
             for symbol in line:
-                token.append(vocab.symbol_to_index[symbol])
+                token.append(vocab[symbol])
     token = torch.tensor(token, dtype=torch.long)
     return token
