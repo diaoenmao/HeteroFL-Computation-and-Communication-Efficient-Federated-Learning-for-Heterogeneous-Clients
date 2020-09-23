@@ -7,8 +7,5 @@ class Scaler(nn.Module):
         self.rate = rate
 
     def forward(self, input):
-        if self.training:
-            output = input / self.rate
-        else:
-            output = input
+        output = input / self.rate if self.training else input
         return output

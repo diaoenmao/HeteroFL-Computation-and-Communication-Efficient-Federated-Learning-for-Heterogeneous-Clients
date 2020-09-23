@@ -143,7 +143,7 @@ def process_control():
         raise ValueError('Not valid model split mode')
     cfg['conv'] = {'hidden_size': [64, 128, 256, 512]}
     cfg['resnet'] = {'hidden_size': [64, 128, 256, 512]}
-    cfg['transformer'] = {'embedding_size': 256, 'num_heads': 8, 'hidden_size': 512, 'num_layers': 6, 'dropout': 0.2}
+    cfg['transformer'] = {'embedding_size': 256, 'num_heads': 8, 'hidden_size': 512, 'num_layers': 4, 'dropout': 0.2}
     if cfg['data_name'] in ['MNIST']:
         cfg['data_shape'] = [1, 28, 28]
         cfg['optimizer_name'] = 'SGD'
@@ -195,12 +195,12 @@ def process_control():
         cfg['weight_decay'] = 5e-4
         cfg['scheduler_name'] = 'MultiStepLR'
         cfg['factor'] = 0.1
-        cfg['bptt'] = 100
+        cfg['bptt'] = 64
         cfg['mask_rate'] = 0.15
         if cfg['data_split_mode'] == 'iid':
-            cfg['num_epochs'] = {'global': 100, 'local': 5}
-            cfg['batch_size'] = {'train': 100, 'test': 100}
-            cfg['milestones'] = [25, 50]
+            cfg['num_epochs'] = {'global': 200, 'local': 1}
+            cfg['batch_size'] = {'train': 100, 'test': 10}
+            cfg['milestones'] = [50, 100]
         elif cfg['data_split_mode'] == 'none':
             cfg['num_epochs'] = 100
             cfg['batch_size'] = {'train': 100, 'test': 100}

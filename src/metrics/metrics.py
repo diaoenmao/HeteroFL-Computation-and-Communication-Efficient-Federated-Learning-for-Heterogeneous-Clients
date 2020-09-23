@@ -15,6 +15,11 @@ def Accuracy(output, target, topk=1):
 
 def Perplexity(output, target):
     with torch.no_grad():
+        # label_mask = torch.arange(output.size(1), device=output.device)[output.sum(dim=[0,2]) != 0]
+        # label_map = output.new_zeros(output.size(1), device=output.device, dtype=torch.long)
+        # output = output[:, label_mask,]
+        # label_map[label_mask] = torch.arange(output.size(1), device=output.device)
+        # target = label_map[target]
         ce = F.cross_entropy(output, target)
         perplexity = torch.exp(ce).item()
     return perplexity

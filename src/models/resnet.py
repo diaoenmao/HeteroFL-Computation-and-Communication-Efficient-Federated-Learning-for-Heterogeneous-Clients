@@ -92,7 +92,7 @@ class ResNet(nn.Module):
         if 'label_split' in input:
             label_mask = torch.zeros(cfg['classes_size'], device=out.device)
             label_mask[input['label_split']] = 1
-            out = out * label_mask
+            out = out.masked_fill(label_mask == 0, 0)
         output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['label'])
         return output

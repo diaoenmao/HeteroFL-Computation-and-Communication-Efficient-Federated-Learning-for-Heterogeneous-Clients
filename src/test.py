@@ -117,9 +117,14 @@ if __name__ == '__main__':
     print(norm)
     for i in range(100):
         y = m(x)
-        mask = torch.zeros(10)
+        # mask = torch.zeros(C) + float('-inf')
+        # mask[:c] = 0
+        # y = y + mask
+        mask = torch.zeros(C)
         mask[:c] = 1
-        y = y * mask
+        # y = y * mask
+        y = y.masked_fill(mask==0, 0)
+        y = y.masked_fill(mask == 0, float('-inf'))
         y = y.log_softmax(dim=-1)
         loss = F.nll_loss(y, label)
         loss.backward()

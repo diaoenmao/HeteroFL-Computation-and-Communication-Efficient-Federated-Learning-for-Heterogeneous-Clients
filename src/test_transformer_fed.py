@@ -55,27 +55,17 @@ def runExperiment():
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     test_logger = Logger(logger_path)
     test_logger.safe(True)
-    test(dataset['test'], data_split['test'], label_split, model, test_logger, last_epoch)
+    test(dataset['test'], model, test_logger, last_epoch)
     test_logger.safe(False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': {'train': train_logger, 'test': test_logger}}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
     return
 
 
-def test(dataset, data_split, label_split, model, logger, epoch):
+def test(dataset, model, logger, epoch):
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        for m in range(cfg['num_users']):
-            batch_dataset = BatchDataset(SplitDataset(dataset, data_split[m]), cfg['bptt'])
-            for i, input in enumerate(batch_dataset):
-                input_size = input['img'].size(0)
-                input['label_split'] = torch.tensor(label_split[m])
-                input = to_device(input, cfg['device'])
-                output = model(input)
-                output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-                evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
-                logger.append(evaluation, 'test', input_size)
         batch_dataset = BatchDataset(dataset, cfg['bptt'])
         for i, input in enumerate(batch_dataset):
             input_size = input['img'].size(0)
@@ -86,7 +76,7 @@ def test(dataset, data_split, label_split, model, logger, epoch):
             logger.append(evaluation, 'test', input_size)
         info = {'info': ['Model: {}'.format(cfg['model_tag']), 'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
+        logger.write('test', cfg['metric_name']['test']['Global'])
     return
 
 

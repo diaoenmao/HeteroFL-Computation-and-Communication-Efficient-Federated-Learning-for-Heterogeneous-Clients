@@ -120,12 +120,13 @@ class Federation:
                                 elif 'decoder' in k and 'linear2' in k:
                                     input_idx_i_m = idx_i[m]
                                     output_idx_i_m = torch.arange(output_size, device=v.device)
-                                elif 'in_proj' in k:
+                                elif 'linear_q' in k or 'linear_k' in k or 'linear_v' in k:
                                     input_idx_i_m = idx_i[m]
                                     scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
-                                    local_output_size = int(np.ceil(output_size // 3 * scaler_rate))
-                                    output_idx_i_m = (torch.arange(output_size, device=v.device)
-                                                      .reshape(3, output_size // 3))[:, :local_output_size].reshape(-1)
+                                    local_output_size = int(np.ceil(output_size // cfg['transformer']['num_heads']
+                                                                    * scaler_rate))
+                                    output_idx_i_m = (torch.arange(output_size, device=v.device).reshape(
+                                        cfg['transformer']['num_heads'], -1))[:, :local_output_size].reshape(-1)
                                     idx_i[m] = output_idx_i_m
                                 else:
                                     input_idx_i_m = idx_i[m]
@@ -142,12 +143,11 @@ class Federation:
                             if 'decoder' in k and 'linear2' in k:
                                 input_idx_i_m = torch.arange(input_size, device=v.device)
                                 idx[m][k] = input_idx_i_m
-                            elif 'in_proj' in k:
+                            elif 'linear_q' in k or 'linear_k' in k or 'linear_v' in k:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
-                                scaler_rate = self.model_rate[user_idx[m]] / cfg['global_model_rate']
-                                local_input_size = int(np.ceil(input_size // 3 * scaler_rate))
-                                idx_i[m] = torch.arange(input_size // 3, device=v.device)[:local_input_size]
+                                if 'linear_v' not in k:
+                                    idx_i[m] = idx[m][k.replace('bias', 'weight')][1]
                             else:
                                 input_idx_i_m = idx_i[m]
                                 idx[m][k] = input_idx_i_m
@@ -250,16 +250,22 @@ class Federation:
                         count[k] += 1
                 tmp_v[count[k] > 0] = tmp_v[count[k] > 0].div_(count[k][count[k] > 0])
                 v[count[k] > 0] = tmp_v[count[k] > 0].to(v.dtype)
-        elif cfg['model_name'] == 'tranformer':
+        elif cfg['model_name'] == 'transformer':
             for k, v in self.global_parameters.items():
                 parameter_type = k.split('.')[-1]
                 count[k] = v.new_zeros(v.size(), dtype=torch.float32)
                 tmp_v = v.new_zeros(v.size(), dtype=torch.float32)
                 for m in range(len(local_parameters)):
                     if 'weight' in parameter_type or 'bias' in parameter_type:
-                        if parameter_type == 'weight':
+                        if 'weight' in parameter_type:
                             if v.dim() > 1:
-                                if 'decoder' in k and 'linear2' in k:
+                                if k.split('.')[-2] == 'embedding':
+                                    label_split = self.label_split[user_idx[m]]
+                                    param_idx[m][k] = list(param_idx[m][k])
+                                    param_idx[m][k][0] = param_idx[m][k][0][label_split]
+                                    tmp_v[torch.meshgrid(param_idx[m][k])] += local_parameters[m][k][label_split]
+                                    count[k][torch.meshgrid(param_idx[m][k])] += 1
+                                elif 'decoder' in k and 'linear2' in k:
                                     label_split = self.label_split[user_idx[m]]
                                     param_idx[m][k] = list(param_idx[m][k])
                                     param_idx[m][k][0] = param_idx[m][k][0][label_split]

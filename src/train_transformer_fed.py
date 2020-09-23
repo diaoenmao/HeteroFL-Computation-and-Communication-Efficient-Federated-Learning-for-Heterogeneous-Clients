@@ -31,8 +31,7 @@ cfg['control_name'] = '_'.join([cfg['control'][k] for k in cfg['control']])
 cfg['pivot_metric'] = 'Global-Perplexity'
 cfg['pivot'] = float('inf')
 cfg['metric_name'] = {'train': {'Local': ['Local-Loss', 'Local-Perplexity']},
-                      'test': {'Local': ['Local-Loss', 'Local-Perplexity'],
-                               'Global': ['Global-Loss', 'Global-Perplexity']}}
+                      'test': {'Global': ['Global-Loss', 'Global-Perplexity']}}
 
 
 def main():
@@ -78,7 +77,7 @@ def runExperiment():
         logger.safe(True)
         train(dataset['train'], data_split['train'], label_split, federation, model, optimizer, logger, epoch)
         test_model = model
-        test(dataset['test'], data_split['test'], label_split, test_model, logger, epoch)
+        test(dataset['test'], test_model, logger, epoch)
         if cfg['scheduler_name'] == 'ReduceLROnPlateau':
             scheduler.step(metrics=logger.mean['train/{}'.format(cfg['pivot_metric'])])
         else:
@@ -126,20 +125,10 @@ def train(dataset, data_split, label_split, federation, global_model, optimizer,
     return
 
 
-def test(dataset, data_split, label_split, model, logger, epoch):
+def test(dataset, model, logger, epoch):
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        for m in range(cfg['num_users']):
-            batch_dataset = BatchDataset(SplitDataset(dataset, data_split[m]), cfg['bptt'])
-            for i, input in enumerate(batch_dataset):
-                input_size = input['label'].size(0)
-                input['label_split'] = torch.tensor(label_split[m])
-                input = to_device(input, cfg['device'])
-                output = model(input)
-                output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']
-                evaluation = metric.evaluate(cfg['metric_name']['test']['Local'], input, output)
-                logger.append(evaluation, 'test', input_size)
         batch_dataset = BatchDataset(dataset, cfg['bptt'])
         for i, input in enumerate(batch_dataset):
             input_size = input['label'].size(0)
@@ -151,7 +140,7 @@ def test(dataset, data_split, label_split, model, logger, epoch):
         info = {'info': ['Model: {}'.format(cfg['model_tag']),
                          'Test Epoch: {}({:.0f}%)'.format(epoch, 100.)]}
         logger.append(info, 'test', mean=False)
-        logger.write('test', cfg['metric_name']['test']['Local'] + cfg['metric_name']['test']['Global'])
+        logger.write('test', cfg['metric_name']['test']['Global'])
     return
 
 
