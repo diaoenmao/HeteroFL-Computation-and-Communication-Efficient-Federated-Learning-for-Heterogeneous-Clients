@@ -34,7 +34,7 @@ class Conv(nn.Module):
         if 'label_split' in input:
             label_mask = torch.zeros(cfg['classes_size'], device=out.device)
             label_mask[input['label_split']] = 1
-            out = out.masked_fill(label_mask == 0, 0)
+            out = out.masked_fill(label_mask == 0, float('-inf'))
         output['score'] = out
         output['loss'] = F.cross_entropy(out, input['label'], reduction='mean')
         return output

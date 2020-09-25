@@ -17,6 +17,7 @@ combination = []
 for i in range(1, len(combination_mode) + 1):
     combination_mode_i = ['-'.join(list(x)) for x in itertools.combinations(combination_mode, i)]
     combination.extend(combination_mode_i)
+combination = combination[5:]
 interp = []
 for i in range(1, 10):
     for j in range(len(model_split_mode)):
@@ -29,81 +30,118 @@ model_color = {model_split_rate_key[i]: colors[i] for i in range(len(model_split
 interp_label_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e']
 
 
+def make_control_list(data_name):
+    data_name_dict = {'MNIST': 'conv', 'CIFAR10': 'resnet18', 'WikiText2': 'transformer'}
+    model_name = data_name_dict[data_name]
+    no_fed_control = [exp, [data_name], ['label'], [model_name], ['0'], ['1'], ['1'], ['none'], ['fix'],
+                      combination_mode]
+    fed_single_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+                          ['fix'], combination_mode]
+    fed_combination_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+                               ['dynamic'], combination]
+    fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+                          ['fix'], interp]
+    local_combination_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid'], ['fix'],
+                                 combination]
+    local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid'], ['fix'],
+                            interp]
+    controls_list = [no_fed_control, fed_single_control, fed_combination_control, fed_interp_control]
+    return controls_list
+
+
 def main():
-    no_fed_control = [exp, ['MNIST', 'CIFAR10'], ['label'], ['conv', 'resnet18'], ['SGD'], ['1'], ['1'],
-                      ['none'], combination_mode]
-    combination_control = [exp, ['MNIST', 'CIFAR10'], ['label'], ['conv', 'resnet18'], ['SGD'], ['100'], ['0.1'],
-                           ['iid'], combination]
-    interp_control = [exp, ['MNIST', 'CIFAR10'], ['label'], ['conv', 'resnet18'], ['SGD'], ['100'], ['0.1'],
-                      ['iid'], interp + combination_mode]
-    controls_list = [interp_control]
+    mnist_control_list = make_control_list('MNIST')
+    cifar10_control_list = make_control_list('CIFAR10')
+    controls_list = mnist_control_list + cifar10_control_list
     controls = []
     for i in range(len(controls_list)):
         controls.extend(list(itertools.product(*controls_list[i])))
-    processed_result = process_result(controls)
-    with open('{}/processed_result.json'.format(result_path), 'w') as fp:
-        json.dump(processed_result, fp, indent=2)
-    save(processed_result, os.path.join(result_path, 'processed_result.pt'))
+    processed_result_exp, processed_result_history = process_result(controls)
+    print(processed_result_exp)
+    with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
+        json.dump(processed_result_exp, fp, indent=2)
+    save(processed_result_exp, os.path.join(result_path, 'processed_result_exp.pt'))
+    save(processed_result_history, os.path.join(result_path, 'processed_result_history.pt'))
     extracted_processed_result = {}
-    extract_processed_result(extracted_processed_result, [], processed_result)
+    extract_processed_result(extracted_processed_result, processed_result_exp, [])
     make_vis(extracted_processed_result)
     return
 
 
 def process_result(controls):
-    processed_result = {}
+    processed_result_exp, processed_result_history = {}, {}
     for control in controls:
         model_tag = '_'.join(control)
-        extract_result(list(control), processed_result, model_tag)
-    summarize_result(processed_result)
-    return processed_result
+        extract_result(list(control), model_tag, processed_result_exp, processed_result_history)
+    summarize_result(processed_result_exp)
+    summarize_result(processed_result_history)
+    return processed_result_exp, processed_result_history
 
 
-def extract_result(control, processed_result, model_tag):
+def extract_result(control, model_tag, processed_result_exp, processed_result_history):
     if len(control) == 1:
         exp_idx = exp.index(control[0])
         base_result_path_i = os.path.join(result_path, '{}.pt'.format(model_tag))
         if os.path.exists(base_result_path_i):
-            if 'rate' not in processed_result:
-                processed_result['rate'] = {'exp': [control_name_to_rate(model_tag.split('_')[-1])]}
-            if 'loss' not in processed_result:
-                processed_result['loss'] = {'exp': [None for _ in range(num_experiments)]}
-            if 'acc' not in processed_result:
-                processed_result['acc'] = {'exp': [None for _ in range(num_experiments)]}
+            if 'params' not in processed_result_exp:
+                num_params, num_flops, ratio = make_stats(model_tag)
+                processed_result_exp['Params'] = {'exp': [num_params]}
+                processed_result_exp['FLOPs'] = {'exp': [num_flops]}
+                processed_result_exp['Ratio'] = {'exp': [ratio]}
             base_result = load(base_result_path_i)
-            processed_result['loss']['exp'][exp_idx] = base_result['logger'].mean['test/Loss']
-            processed_result['acc']['exp'][exp_idx] = base_result['logger'].mean['test/Accuracy']
+            for k in base_result['logger']['test'].mean:
+                metric_name = k.split('/')[1]
+                if metric_name not in processed_result_exp:
+                    processed_result_exp[metric_name] = {'exp': [None for _ in range(num_experiments)]}
+                    processed_result_history[metric_name] = {'history': [None for _ in range(num_experiments)]}
+                processed_result_exp[metric_name]['exp'][exp_idx] = base_result['logger']['test'].mean[k]
+                processed_result_history[metric_name]['history'][exp_idx] = base_result['logger']['train'].history[k]
+        else:
+            print('Missing {}'.format(base_result_path_i))
     else:
-        if control[1] not in processed_result:
-            processed_result[control[1]] = {}
-        extract_result([control[0]] + control[2:], processed_result[control[1]], model_tag)
+        if control[1] not in processed_result_exp:
+            processed_result_exp[control[1]] = {}
+            processed_result_history[control[1]] = {}
+        extract_result([control[0]] + control[2:], model_tag, processed_result_exp[control[1]],
+                       processed_result_history[control[1]])
     return
 
 
 def summarize_result(processed_result):
     if 'exp' in processed_result:
-        processed_result['exp'] = np.stack(processed_result['exp'], axis=0)
-        processed_result['mean'] = np.mean(processed_result['exp'], axis=0).item()
-        processed_result['std'] = np.std(processed_result['exp'], axis=0).item()
-        processed_result['max'] = np.max(processed_result['exp'], axis=0).item()
-        processed_result['min'] = np.min(processed_result['exp'], axis=0).item()
-        processed_result['argmax'] = np.argmax(processed_result['exp'], axis=0).item()
-        processed_result['argmin'] = np.argmin(processed_result['exp'], axis=0).item()
-        processed_result['exp'] = processed_result['exp'].tolist()
+        pivot = 'exp'
+        processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
+        processed_result['mean'] = np.mean(processed_result[pivot], axis=0).item()
+        processed_result['std'] = np.std(processed_result[pivot], axis=0).item()
+        processed_result['max'] = np.max(processed_result[pivot], axis=0).item()
+        processed_result['min'] = np.min(processed_result[pivot], axis=0).item()
+        processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0).item()
+        processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0).item()
+        processed_result[pivot] = processed_result[pivot].tolist()
+    elif 'history' in processed_result:
+        pivot = 'history'
+        processed_result[pivot] = np.stack(processed_result[pivot], axis=0)
+        processed_result['mean'] = np.mean(processed_result[pivot], axis=0)
+        processed_result['std'] = np.std(processed_result[pivot], axis=0)
+        processed_result['max'] = np.max(processed_result[pivot], axis=0)
+        processed_result['min'] = np.min(processed_result[pivot], axis=0)
+        processed_result['argmax'] = np.argmax(processed_result[pivot], axis=0)
+        processed_result['argmin'] = np.argmin(processed_result[pivot], axis=0)
+        processed_result[pivot] = processed_result[pivot].tolist()
     else:
         for k, v in processed_result.items():
             summarize_result(v)
+        return
     return
 
 
-def extract_processed_result(extracted_processed_result, control, processed_result):
+def extract_processed_result(extracted_processed_result, processed_result, control):
     if 'exp' in processed_result:
         data_name = control[0]
         model_name = control[2]
-        optimizer_name = control[3]
         control_name = control[-2]
         metric_name = control[-1]
-        fig_name = '_'.join([data_name, model_name, optimizer_name])
+        fig_name = '_'.join([data_name, model_name])
         if fig_name not in extracted_processed_result:
             extracted_processed_result[fig_name] = {}
         if '-' in control_name:
@@ -119,7 +157,7 @@ def extract_processed_result(extracted_processed_result, control, processed_resu
                     extracted_processed_result[fig_name][label_name][metric_name].append(processed_result['mean'])
     else:
         for k, v in processed_result.items():
-            extract_processed_result(extracted_processed_result, control + [k], v)
+            extract_processed_result(extracted_processed_result, v, control + [k])
     return
 
 
@@ -147,15 +185,33 @@ def make_vis(extracted_processed_result):
     return
 
 
-def control_name_to_rate(control_name):
+def make_stats(model_tag):
+    model_tag_list = model_tag.split('_')
+    data_name = model_tag_list[1]
+    model_name = model_tag_list[3]
+    model_mode = model_tag_list[-1]
+    model_mode_list = model_mode.split('-')
+    global_model_mode = model_mode_list[0][0]
+    stats_result_path = os.path.join(result_path, '{}_{}_{}.pt'.format(data_name, model_name, global_model_mode))
+    stats_result = load(stats_result_path)
+    global_num_params = stats_result['num_params']
+    all_global_num_params = 0
+    num_params = 0
+    num_flops = 0
     frac = 0
-    rate = 0
-    control_name_list = control_name.split('-')
-    for control_name in control_name_list:
-        frac += int(control_name[1])
-        rate += model_split_rate[control_name[0]] ** 2 * int(control_name[1])
-    rate /= frac
-    return rate
+    for i in range(len(model_mode_list)):
+        model_mode_i = model_mode_list[i][0]
+        frac_i = int(model_mode_list[i][1])
+        stats_result_path_i = os.path.join(result_path, '{}_{}_{}.pt'.format(data_name, model_name, model_mode_i))
+        stats_result = load(stats_result_path_i)
+        num_params += stats_result['num_params'] * frac_i
+        num_flops += stats_result['num_flops'] * frac_i
+        all_global_num_params += global_num_params * frac_i
+        frac += frac_i
+    ratio = num_params / all_global_num_params
+    num_params /= frac
+    num_flops /= frac
+    return num_params, num_flops, ratio
 
 
 if __name__ == '__main__':

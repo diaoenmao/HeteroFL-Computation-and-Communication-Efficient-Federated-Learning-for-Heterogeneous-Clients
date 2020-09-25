@@ -158,7 +158,7 @@ class Transformer(nn.Module):
         if 'label_split' in input:
             label_mask = torch.zeros((cfg['num_tokens'], 1), device=out.device)
             label_mask[input['label_split']] = 1
-            out = out.masked_fill(label_mask == 0, 0)
+            out = out.masked_fill(label_mask == 0, float('-inf'))
         output['score'] = out
         output['loss'] = F.cross_entropy(output['score'], input['label'])
         return output

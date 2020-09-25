@@ -4,7 +4,7 @@ control:
   fed: '1'
   num_users: '100'
   frac: '0.1'
-  data_split_mode: 'iid'
+  data_split_mode: 'non-iid-2'
   model_split_mode: 'fix'
   model_mode: 'a1-e1'
 # data

@@ -105,13 +105,14 @@ import time
 
 
 if __name__ == '__main__':
-    torch.manual_seed(0)
-    x = torch.randn(100, 20)
+    # torch.manual_seed(2)
+    N = 100
     C = 10
     m = nn.Linear(20, C)
     optimizer = torch.optim.SGD(m.parameters(), lr=0.01)
-    c = 2
-    label = torch.arange(c).repeat(100 // c)
+    c = 10
+    x = torch.randn(N, 20)
+    label = torch.arange(c).repeat(N // c)
     print(label)
     norm = m.weight.abs().mean(dim=1)
     print(norm)
@@ -124,7 +125,7 @@ if __name__ == '__main__':
         mask[:c] = 1
         # y = y * mask
         y = y.masked_fill(mask==0, 0)
-        y = y.masked_fill(mask == 0, float('-inf'))
+        # y = y.masked_fill(mask == 0, float('-inf'))
         y = y.log_softmax(dim=-1)
         loss = F.nll_loss(y, label)
         loss.backward()
