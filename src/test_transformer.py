@@ -44,17 +44,17 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
-    load_tag = 'best'
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                  .format(cfg['model_name']))
-    last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag=load_tag, strict=False)
+    last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag='best', strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
-    logger = Logger(logger_path)
-    logger.safe(True)
-    test(dataset['test'], model, logger, last_epoch)
-    logger.safe(False)
-    save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': logger}
+    test_logger = Logger(logger_path)
+    test_logger.safe(True)
+    test(dataset['test'], model, test_logger, last_epoch)
+    test_logger.safe(False)
+    _, _, _, _, train_logger = resume(model, cfg['model_tag'], load_tag='best', strict=False)
+    save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': {'train': train_logger, 'test': test_logger}}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
     return
 

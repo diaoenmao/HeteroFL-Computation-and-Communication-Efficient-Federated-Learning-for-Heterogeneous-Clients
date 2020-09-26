@@ -4,9 +4,9 @@ control:
   fed: '1'
   num_users: '100'
   frac: '0.1'
-  data_split_mode: 'non-iid-2'
+  data_split_mode: 'iid'
   model_split_mode: 'fix'
-  model_mode: 'a1-e1'
+  model_mode: 'a1'
 # data
 data_name: CIFAR10
 subset: label

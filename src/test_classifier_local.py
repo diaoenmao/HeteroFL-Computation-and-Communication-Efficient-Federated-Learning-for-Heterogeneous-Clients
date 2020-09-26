@@ -46,13 +46,11 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
-    load_tag = 'best'
     federation = Federation(None, cfg['model_rate'], None)
     model = torch.nn.ModuleList([])
     for m in range(cfg['num_users']):
         exec('model.append(models.{}(model_rate=federation.model_rate[m])).to("cpu")'.format(cfg['model_name']))
-    last_epoch, data_split, label_split, model, _, _, train_logger = resume(model, cfg['model_tag'], load_tag=load_tag,
-                                                                            strict=False)
+    last_epoch, data_split, label_split, model, _, _, _ = resume(model, cfg['model_tag'], load_tag='best', strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
     logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
     test_logger = Logger(logger_path)
@@ -60,6 +58,7 @@ def runExperiment():
     stats(dataset['train'], model, data_split['train'], federation)
     test(dataset['test'], data_split['test'], label_split, model, test_logger, last_epoch)
     test_logger.safe(False)
+    _, _, _, _, _, _, train_logger = resume(model, cfg['model_tag'], load_tag='checkpoint', strict=False)
     save_result = {'cfg': cfg, 'epoch': last_epoch, 'logger': {'train': train_logger, 'test': test_logger}}
     save(save_result, './output/result/{}.pt'.format(cfg['model_tag']))
     return

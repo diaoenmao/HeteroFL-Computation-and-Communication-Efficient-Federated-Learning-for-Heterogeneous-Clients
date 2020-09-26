@@ -2,10 +2,12 @@ import os
 import itertools
 import json
 import numpy as np
+import pandas as pd
 from utils import save, load, makedir_exist_ok
 from config import cfg
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from collections import defaultdict
 
 result_path = './output/result'
 vis_path = './output/vis'
@@ -27,7 +29,7 @@ model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
 model_split_rate_key = list(model_split_rate.keys())
 colors = cm.rainbow(np.linspace(1, 0, len(model_split_rate_key)))
 model_color = {model_split_rate_key[i]: colors[i] for i in range(len(model_split_rate_key))}
-interp_label_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e']
+interp_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e']
 
 
 def make_control_list(data_name):
@@ -41,10 +43,10 @@ def make_control_list(data_name):
                                ['dynamic'], combination]
     fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
                           ['fix'], interp]
-    local_combination_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid'], ['fix'],
-                                 combination]
-    local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid'], ['fix'],
-                            interp]
+    # local_combination_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'],
+    #                              ['iid', 'non-iid-2'], ['fix'], combination]
+    # local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+    #                         ['fix'], interp]
     controls_list = [no_fed_control, fed_single_control, fed_combination_control, fed_interp_control]
     return controls_list
 
@@ -57,14 +59,17 @@ def main():
     for i in range(len(controls_list)):
         controls.extend(list(itertools.product(*controls_list[i])))
     processed_result_exp, processed_result_history = process_result(controls)
-    print(processed_result_exp)
-    with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
-        json.dump(processed_result_exp, fp, indent=2)
-    save(processed_result_exp, os.path.join(result_path, 'processed_result_exp.pt'))
-    save(processed_result_history, os.path.join(result_path, 'processed_result_history.pt'))
+    # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
+    #     json.dump(processed_result_exp, fp, indent=2)
+    # save(processed_result_exp, os.path.join(result_path, 'processed_result_exp.pt'))
+    # save(processed_result_history, os.path.join(result_path, 'processed_result_history.pt'))
+    # extracted_processed_result = {}
+    # extract_processed_result(extracted_processed_result, processed_result_exp, [])
+    # df = make_df(extracted_processed_result)
+    # make_vis(df)
     extracted_processed_result = {}
-    extract_processed_result(extracted_processed_result, processed_result_exp, [])
-    make_vis(extracted_processed_result)
+    extract_processed_result(extracted_processed_result, processed_result_history, [])
+    make_learning_curve(extracted_processed_result)
     return
 
 
@@ -84,10 +89,11 @@ def extract_result(control, model_tag, processed_result_exp, processed_result_hi
         base_result_path_i = os.path.join(result_path, '{}.pt'.format(model_tag))
         if os.path.exists(base_result_path_i):
             if 'params' not in processed_result_exp:
-                num_params, num_flops, ratio = make_stats(model_tag)
+                ratio, num_params, num_flops, space = make_stats(model_tag)
+                processed_result_exp['Ratio'] = {'exp': [ratio]}
                 processed_result_exp['Params'] = {'exp': [num_params]}
                 processed_result_exp['FLOPs'] = {'exp': [num_flops]}
-                processed_result_exp['Ratio'] = {'exp': [ratio]}
+                processed_result_exp['Space'] = {'exp': [space]}
             base_result = load(base_result_path_i)
             for k in base_result['logger']['test'].mean:
                 metric_name = k.split('/')[1]
@@ -136,48 +142,112 @@ def summarize_result(processed_result):
 
 
 def extract_processed_result(extracted_processed_result, processed_result, control):
-    if 'exp' in processed_result:
-        data_name = control[0]
-        model_name = control[2]
-        control_name = control[-2]
+    if 'exp' in processed_result or 'history' in processed_result:
+        exp_name = '_'.join(control[:-1])
         metric_name = control[-1]
-        fig_name = '_'.join([data_name, model_name])
-        if fig_name not in extracted_processed_result:
-            extracted_processed_result[fig_name] = {}
-        if '-' in control_name:
-            label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-            if label_name not in extracted_processed_result[fig_name]:
-                extracted_processed_result[fig_name][label_name] = {'rate': [], 'loss': [], 'acc': []}
-            extracted_processed_result[fig_name][label_name][metric_name].append(processed_result['mean'])
-        else:
-            for label_name in interp_label_name:
-                if control_name[0] in label_name:
-                    if label_name not in extracted_processed_result[fig_name]:
-                        extracted_processed_result[fig_name][label_name] = {'rate': [], 'loss': [], 'acc': []}
-                    extracted_processed_result[fig_name][label_name][metric_name].append(processed_result['mean'])
+        if exp_name not in extracted_processed_result:
+            extracted_processed_result[exp_name] = defaultdict()
+        extracted_processed_result[exp_name]['{}_mean'.format(metric_name)] = processed_result['mean']
+        extracted_processed_result[exp_name]['{}_std'.format(metric_name)] = processed_result['std']
     else:
         for k, v in processed_result.items():
             extract_processed_result(extracted_processed_result, v, control + [k])
     return
 
 
-def make_vis(extracted_processed_result):
+def make_df(extracted_processed_result):
+    df = defaultdict(list)
+    for exp_name in extracted_processed_result:
+        control = exp_name.split('_')
+        data_split_mode, mode_split_mode, control_name = control[-3:]
+        index_name = [control_name]
+        if data_split_mode == 'none':
+            df_name = '_'.join(control[:-1])
+            df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
+        else:
+            if mode_split_mode == 'fix':
+                if '-' in control_name:
+                    label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
+                    df_name = '{}_{}'.format('_'.join(control[:-1]), label_name)
+                    df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
+                else:
+                    for label_name in interp_name:
+                        if control_name[0] == label_name[0]:
+                            df_name = '{}_{}'.format('_'.join(control[:-1]), label_name)
+                            df[df_name].append(
+                                pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
+            else:
+                df_name = '_'.join(control[:-1])
+                df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
+    startrow = 0
+    writer = pd.ExcelWriter('{}/result.xlsx'.format(result_path), engine='xlsxwriter')
+    for df_name in df:
+        df[df_name] = pd.concat(df[df_name])
+        df[df_name] = df[df_name].sort_values(by=['Params_mean'])
+        df[df_name].to_excel(writer, sheet_name='Sheet1', startrow=startrow + 1)
+        writer.sheets['Sheet1'].write_string(startrow, 0, df_name)
+        startrow = startrow + len(df[df_name].index) + 3
+    writer.save()
+    return df
+
+
+def make_vis(df):
     fig = {}
-    for fig_name in extracted_processed_result:
-        for label_name in extracted_processed_result[fig_name]:
-            fig[fig_name] = plt.figure(fig_name)
-            rate = np.array(extracted_processed_result[fig_name][label_name]['rate'])
-            loss = np.array(extracted_processed_result[fig_name][label_name]['loss'])
-            acc = np.array(extracted_processed_result[fig_name][label_name]['acc'])
-            sorted_idx = np.argsort(rate)
-            rate, loss, acc = rate[sorted_idx], loss[sorted_idx], acc[sorted_idx]
-            plt.plot(rate, acc, '^--', label=label_name)
+    for df_name in df:
+        if 'fix' in df_name and 'none' not in df_name:
+            control = df_name.split('_')
+            label_name = control[-1]
+            x = df[df_name]['Params_mean']
+            if 'non-iid-2' in df_name:
+                fig_name = '{}_{}_local'.format('_'.join(control[:-1]), label_name[0])
+                fig[fig_name] = plt.figure(fig_name)
+                y = df[df_name]['Local-Accuracy_mean']
+                plt.plot(x, y, '^--', label=label_name)
+                fig_name = '{}_{}_global'.format('_'.join(control[:-1]), label_name[0])
+                fig[fig_name] = plt.figure(fig_name)
+                y = df[df_name]['Global-Accuracy_mean']
+                plt.plot(x, y, '^--', label=label_name)
+            elif 'iid' in df_name:
+                fig_name = '{}_{}'.format('_'.join(control[:-1]), label_name[0])
+                fig[fig_name] = plt.figure(fig_name)
+                y = df[df_name]['Global-Accuracy_mean']
+                plt.plot(x, y, '^--', label=label_name)
+            else:
+                raise ValueError('Not valid df name')
     for fig_name in fig:
         fig[fig_name] = plt.figure(fig_name)
-        plt.xlabel('rate')
-        plt.ylabel('Accuracy')
-        plt.grid()
-        plt.legend()
+        plt.legend(loc='lower right')
+        plt.xlabel('Number of Model Parameters')
+        if 'MNIST' in fig_name:
+            plt.ylabel('Accuracy')
+        elif 'CIFAR10' in fig_name:
+            plt.ylabel('Accuracy')
+        else:
+            plt.ylabel('Perplexity')
+        fig_path = '{}/{}.{}'.format(vis_path, fig_name, cfg['save_format'])
+        makedir_exist_ok(vis_path)
+        plt.savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.close(fig_name)
+    return
+
+
+def make_learning_curve(processed_result):
+    fig = {}
+    for exp_name in processed_result:
+        control = exp_name.split('_')
+        control_name = control[-1]
+        if control_name in ['a5-b5', 'a5-c5', 'a5-d5', 'a5-e5']:
+            y = processed_result[exp_name]['Global-Loss_mean']
+            x = np.arange(len(y))
+            label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
+            fig_name = '{}_lc'.format('_'.join(control[:-1]))
+            fig[fig_name] = plt.figure(fig_name)
+            plt.plot(x, y, '--', label=label_name)
+    for fig_name in fig:
+        fig[fig_name] = plt.figure(fig_name)
+        plt.legend(loc='upper right')
+        plt.xlabel('Communication Rounds')
+        plt.ylabel('Loss')
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, cfg['save_format'])
         makedir_exist_ok(vis_path)
         plt.savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)
@@ -198,6 +268,7 @@ def make_stats(model_tag):
     all_global_num_params = 0
     num_params = 0
     num_flops = 0
+    space = 0
     frac = 0
     for i in range(len(model_mode_list)):
         model_mode_i = model_mode_list[i][0]
@@ -206,12 +277,14 @@ def make_stats(model_tag):
         stats_result = load(stats_result_path_i)
         num_params += stats_result['num_params'] * frac_i
         num_flops += stats_result['num_flops'] * frac_i
+        space += stats_result['space'] * frac_i
         all_global_num_params += global_num_params * frac_i
         frac += frac_i
     ratio = num_params / all_global_num_params
     num_params /= frac
     num_flops /= frac
-    return num_params, num_flops, ratio
+    space /= frac
+    return ratio, num_params, num_flops, space
 
 
 if __name__ == '__main__':

@@ -105,26 +105,22 @@ import time
 
 
 if __name__ == '__main__':
-    # torch.manual_seed(2)
+    torch.manual_seed(0)
     N = 100
     C = 10
+    c = 2
+    x = torch.randn(N, 20)
     m = nn.Linear(20, C)
     optimizer = torch.optim.SGD(m.parameters(), lr=0.01)
-    c = 10
-    x = torch.randn(N, 20)
     label = torch.arange(c).repeat(N // c)
     print(label)
     norm = m.weight.abs().mean(dim=1)
     print(norm)
-    for i in range(100):
+    for i in range(300):
         y = m(x)
-        # mask = torch.zeros(C) + float('-inf')
-        # mask[:c] = 0
-        # y = y + mask
         mask = torch.zeros(C)
         mask[:c] = 1
-        # y = y * mask
-        y = y.masked_fill(mask==0, 0)
+        y = y.masked_fill(mask == 0, 0)
         # y = y.masked_fill(mask == 0, float('-inf'))
         y = y.log_softmax(dim=-1)
         loss = F.nll_loss(y, label)
