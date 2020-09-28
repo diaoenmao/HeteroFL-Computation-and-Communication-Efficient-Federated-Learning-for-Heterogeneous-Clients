@@ -63,16 +63,6 @@ class MultiheadAttention(nn.Module):
         self.attention = ScaledDotProduct(temperature=(embedding_size // num_heads) ** 0.5)
         self.scaler = Scaler(rate)
 
-    def forward(self, q, k, v, mask=None):
-        q, k, v = self.scaler(self.linear_q(q)), self.scaler(self.linear_k(k)), self.scaler(self.linear_v(v))
-        q, k, v = self._reshape_to_batches(q), self._reshape_to_batches(k), self._reshape_to_batches(v)
-        if mask is not None:
-            mask = mask.repeat(self.num_heads, 1, 1)
-        q, attn = self.attention(q, k, v, mask)
-        q = self._reshape_from_batches(q)
-        q = self.scaler(self.linear_o(q))
-        return q, attn
-
     def _reshape_to_batches(self, x):
         batch_size, seq_len, in_feature = x.size()
         sub_dim = in_feature // self.num_heads
@@ -85,6 +75,16 @@ class MultiheadAttention(nn.Module):
         out_dim = in_feature * self.num_heads
         return x.reshape(batch_size, self.num_heads, seq_len, in_feature).permute(0, 2, 1, 3) \
             .reshape(batch_size, seq_len, out_dim)
+
+    def forward(self, q, k, v, mask=None):
+        q, k, v = self.scaler(self.linear_q(q)), self.scaler(self.linear_k(k)), self.scaler(self.linear_v(v))
+        q, k, v = self._reshape_to_batches(q), self._reshape_to_batches(k), self._reshape_to_batches(v)
+        if mask is not None:
+            mask = mask.repeat(self.num_heads, 1, 1)
+        q, attn = self.attention(q, k, v, mask)
+        q = self._reshape_from_batches(q)
+        q = self.scaler(self.linear_o(q))
+        return q, attn
 
 
 class TransformerEncoderLayer(nn.Module):

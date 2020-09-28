@@ -237,17 +237,20 @@ def make_learning_curve(processed_result):
         control = exp_name.split('_')
         control_name = control[-1]
         if control_name in ['a5-b5', 'a5-c5', 'a5-d5', 'a5-e5']:
-            y = processed_result[exp_name]['Global-Loss_mean']
+            if 'non-iid-2' in exp_name:
+                y = processed_result[exp_name]['Local-Accuracy_mean']
+            else:
+                y = processed_result[exp_name]['Global-Accuracy_mean']
             x = np.arange(len(y))
             label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
             fig_name = '{}_lc'.format('_'.join(control[:-1]))
             fig[fig_name] = plt.figure(fig_name)
-            plt.plot(x, y, '--', label=label_name)
+            plt.plot(x, y, '-', label=label_name)
     for fig_name in fig:
         fig[fig_name] = plt.figure(fig_name)
-        plt.legend(loc='upper right')
-        plt.xlabel('Communication Rounds')
-        plt.ylabel('Loss')
+        plt.legend(loc='lower right')
+        plt.xlabel('Communication rounds')
+        plt.ylabel('Test Accuracy')
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, cfg['save_format'])
         makedir_exist_ok(vis_path)
         plt.savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)

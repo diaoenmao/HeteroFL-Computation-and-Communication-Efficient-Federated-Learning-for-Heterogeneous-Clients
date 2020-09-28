@@ -105,7 +105,7 @@ import time
 
 
 if __name__ == '__main__':
-    torch.manual_seed(0)
+    torch.manual_seed(4)
     N = 100
     C = 10
     c = 2
@@ -116,12 +116,14 @@ if __name__ == '__main__':
     print(label)
     norm = m.weight.abs().mean(dim=1)
     print(norm)
-    for i in range(300):
+    for i in range(100):
         y = m(x)
         mask = torch.zeros(C)
         mask[:c] = 1
         y = y.masked_fill(mask == 0, 0)
         # y = y.masked_fill(mask == 0, float('-inf'))
+        # y_c, y_nc = y[:, :c], y[:, c:]
+        # y = torch.cat([y_c, y_nc.detach()], dim=1)
         y = y.log_softmax(dim=-1)
         loss = F.nll_loss(y, label)
         loss.backward()
