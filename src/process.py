@@ -29,23 +29,27 @@ model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
 model_split_rate_key = list(model_split_rate.keys())
 colors = cm.rainbow(np.linspace(1, 0, len(model_split_rate_key)))
 model_color = {model_split_rate_key[i]: colors[i] for i in range(len(model_split_rate_key))}
-interp_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e']
-
+interp_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e', 'e']
+metric_name_dict = {'MNIST': 'Accuracy', 'CIFAR10': 'Accuracy', 'WikiText2': 'Perplexity'}
+loc_dict = {'MNIST': 'lower right', 'CIFAR10': 'lower right', 'WikiText2': 'upper right'}
+fontsize = 16
 
 def make_control_list(data_name):
     data_name_dict = {'MNIST': 'conv', 'CIFAR10': 'resnet18', 'WikiText2': 'transformer'}
+    data_split_mode_dict = {'MNIST': ['iid', 'non-iid-2'], 'CIFAR10': ['iid', 'non-iid-2'], 'WikiText2': ['iid']}
     model_name = data_name_dict[data_name]
+    data_split_mode = data_split_mode_dict[data_name]
     no_fed_control = [exp, [data_name], ['label'], [model_name], ['0'], ['1'], ['1'], ['none'], ['fix'],
                       combination_mode]
-    fed_single_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+    fed_single_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
                           ['fix'], combination_mode]
-    fed_combination_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+    fed_combination_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
                                ['dynamic'], combination]
-    fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+    fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
                           ['fix'], interp]
     # local_combination_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'],
-    #                              ['iid', 'non-iid-2'], ['fix'], combination]
-    # local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], ['iid', 'non-iid-2'],
+    #                              data_split_mode, ['fix'], combination]
+    # local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], data_split_mode,
     #                         ['fix'], interp]
     controls_list = [no_fed_control, fed_single_control, fed_combination_control, fed_interp_control]
     return controls_list
@@ -54,19 +58,20 @@ def make_control_list(data_name):
 def main():
     mnist_control_list = make_control_list('MNIST')
     cifar10_control_list = make_control_list('CIFAR10')
-    controls_list = mnist_control_list + cifar10_control_list
+    wikitext2_control_list = make_control_list('WikiText2')
+    controls_list = mnist_control_list + cifar10_control_list + wikitext2_control_list
     controls = []
     for i in range(len(controls_list)):
         controls.extend(list(itertools.product(*controls_list[i])))
     processed_result_exp, processed_result_history = process_result(controls)
-    # with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
-    #     json.dump(processed_result_exp, fp, indent=2)
-    # save(processed_result_exp, os.path.join(result_path, 'processed_result_exp.pt'))
-    # save(processed_result_history, os.path.join(result_path, 'processed_result_history.pt'))
-    # extracted_processed_result = {}
-    # extract_processed_result(extracted_processed_result, processed_result_exp, [])
-    # df = make_df(extracted_processed_result)
-    # make_vis(df)
+    with open('{}/processed_result_exp.json'.format(result_path), 'w') as fp:
+        json.dump(processed_result_exp, fp, indent=2)
+    save(processed_result_exp, os.path.join(result_path, 'processed_result_exp.pt'))
+    save(processed_result_history, os.path.join(result_path, 'processed_result_history.pt'))
+    extracted_processed_result = {}
+    extract_processed_result(extracted_processed_result, processed_result_exp, [])
+    df = make_df(extracted_processed_result)
+    make_vis(df)
     extracted_processed_result = {}
     extract_processed_result(extracted_processed_result, processed_result_history, [])
     make_learning_curve(extracted_processed_result)
@@ -165,7 +170,7 @@ def make_df(extracted_processed_result):
             df_name = '_'.join(control[:-1])
             df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
         else:
-            if mode_split_mode == 'fix':
+            if mode_split_mode == 'fix' or control_name == 'e1':
                 if '-' in control_name:
                     label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
                     df_name = '{}_{}'.format('_'.join(control[:-1]), label_name)
@@ -183,7 +188,7 @@ def make_df(extracted_processed_result):
     writer = pd.ExcelWriter('{}/result.xlsx'.format(result_path), engine='xlsxwriter')
     for df_name in df:
         df[df_name] = pd.concat(df[df_name])
-        df[df_name] = df[df_name].sort_values(by=['Params_mean'])
+        df[df_name] = df[df_name].sort_values(by=['Params_mean'], ascending=False)
         df[df_name].to_excel(writer, sheet_name='Sheet1', startrow=startrow + 1)
         writer.sheets['Sheet1'].write_string(startrow, 0, df_name)
         startrow = startrow + len(df[df_name].index) + 3
@@ -196,64 +201,109 @@ def make_vis(df):
     for df_name in df:
         if 'fix' in df_name and 'none' not in df_name:
             control = df_name.split('_')
+            data_name = control[0]
+            metric_name = metric_name_dict[data_name]
             label_name = control[-1]
             x = df[df_name]['Params_mean']
             if 'non-iid-2' in df_name:
                 fig_name = '{}_{}_local'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
-                y = df[df_name]['Local-Accuracy_mean']
+                y = df[df_name]['Local-{}_mean'.format(metric_name)]
                 plt.plot(x, y, '^--', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Number of Model Parameters', fontsize=fontsize)
+                plt.ylabel(metric_name, fontsize=fontsize)
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
+                plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
                 fig_name = '{}_{}_global'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
-                y = df[df_name]['Global-Accuracy_mean']
+                y = df[df_name]['Global-{}_mean'.format(metric_name)]
                 plt.plot(x, y, '^--', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Number of Model Parameters', fontsize=fontsize)
+                plt.ylabel(metric_name, fontsize=fontsize)
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
+                plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
             elif 'iid' in df_name:
                 fig_name = '{}_{}'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
-                y = df[df_name]['Global-Accuracy_mean']
+                y = df[df_name]['Global-{}_mean'.format(metric_name)]
                 plt.plot(x, y, '^--', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Number of Model Parameters', fontsize=fontsize)
+                plt.ylabel(metric_name, fontsize=fontsize)
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
+                plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
             else:
                 raise ValueError('Not valid df name')
     for fig_name in fig:
         fig[fig_name] = plt.figure(fig_name)
-        plt.legend(loc='lower right')
-        plt.xlabel('Number of Model Parameters')
-        if 'MNIST' in fig_name:
-            plt.ylabel('Accuracy')
-        elif 'CIFAR10' in fig_name:
-            plt.ylabel('Accuracy')
-        else:
-            plt.ylabel('Perplexity')
+        plt.grid()
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, cfg['save_format'])
         makedir_exist_ok(vis_path)
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.savefig(fig_path, dpi=500, bbox_inches='tight', pad_inches=0)
         plt.close(fig_name)
     return
 
 
 def make_learning_curve(processed_result):
+    ylim_dict = {'iid': {'global': {'MNIST': [95, 100], 'CIFAR10': [50, 100], 'WikiText2': [0, 20]}},
+                 'non-iid-2': {'global': {'MNIST': [50, 100], 'CIFAR10': [0, 70]},
+                               'local': {'MNIST': [95, 100], 'CIFAR10': [50, 100]}}}
     fig = {}
     for exp_name in processed_result:
         control = exp_name.split('_')
+        data_name = control[0]
+        metric_name = metric_name_dict[data_name]
         control_name = control[-1]
-        if control_name in ['a5-b5', 'a5-c5', 'a5-d5', 'a5-e5']:
+        if control_name in ['a5-b5', 'a5-c5', 'a5-d5', 'a5-e5', 'a1-b1', 'a1-c1', 'a1-d1', 'a1-e1']:
             if 'non-iid-2' in exp_name:
-                y = processed_result[exp_name]['Local-Accuracy_mean']
+                y = processed_result[exp_name]['Local-{}_mean'.format(metric_name)]
+                x = np.arange(len(y))
+                label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
+                fig_name = '{}_lc_local'.format('_'.join(control[:-1]))
+                fig[fig_name] = plt.figure(fig_name)
+                plt.plot(x, y, '-', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Communication rounds', fontsize=fontsize)
+                plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
+                plt.ylim(ylim_dict['non-iid-2']['local'][data_name])
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
+                y = processed_result[exp_name]['Global-{}_mean'.format(metric_name)]
+                x = np.arange(len(y))
+                label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
+                fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
+                fig[fig_name] = plt.figure(fig_name)
+                plt.plot(x, y, '-', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Communication rounds', fontsize=fontsize)
+                plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
+                plt.ylim(ylim_dict['non-iid-2']['global'][data_name])
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
             else:
-                y = processed_result[exp_name]['Global-Accuracy_mean']
-            x = np.arange(len(y))
-            label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-            fig_name = '{}_lc'.format('_'.join(control[:-1]))
-            fig[fig_name] = plt.figure(fig_name)
-            plt.plot(x, y, '-', label=label_name)
+                y = processed_result[exp_name]['Global-{}_mean'.format(metric_name)]
+                x = np.arange(len(y))
+                label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
+                fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
+                fig[fig_name] = plt.figure(fig_name)
+                plt.plot(x, y, '-', label=label_name)
+                plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
+                plt.xlabel('Communication rounds', fontsize=fontsize)
+                plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
+                plt.ylim(ylim_dict['iid']['global'][data_name])
+                plt.xticks(fontsize=fontsize)
+                plt.yticks(fontsize=fontsize)
     for fig_name in fig:
         fig[fig_name] = plt.figure(fig_name)
-        plt.legend(loc='lower right')
-        plt.xlabel('Communication rounds')
-        plt.ylabel('Test Accuracy')
+        plt.grid()
         fig_path = '{}/{}.{}'.format(vis_path, fig_name, cfg['save_format'])
         makedir_exist_ok(vis_path)
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.savefig(fig_path, dpi=500, bbox_inches='tight', pad_inches=0)
         plt.close(fig_name)
     return
 

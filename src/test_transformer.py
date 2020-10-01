@@ -63,8 +63,8 @@ def test(dataset, model, logger, epoch):
     with torch.no_grad():
         metric = Metric()
         model.train(False)
-        dataset = BatchDataset(dataset, cfg['bptt'])
-        for i, input in enumerate(dataset):
+        batch_dataset = BatchDataset(dataset, cfg['bptt'])
+        for i, input in enumerate(batch_dataset):
             input_size = input['label'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)

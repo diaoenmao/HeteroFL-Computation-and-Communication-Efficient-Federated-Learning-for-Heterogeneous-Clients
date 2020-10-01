@@ -146,7 +146,6 @@ def summarize(data_loader, model):
         for name in summary['module'][key]['params']:
             num_params += (summary['module'][key]['params'][name]['mask'] > 0).sum().item()
             num_flops += summary['module'][key]['flops']
-            print(type(summary['module'][key]['flops']))
         summary['total_num_params'] += num_params
         summary['total_num_flops'] += num_flops
     summary['total_space'] = summary['total_num_params'] * 32. / 8 / (1024 ** 2.)

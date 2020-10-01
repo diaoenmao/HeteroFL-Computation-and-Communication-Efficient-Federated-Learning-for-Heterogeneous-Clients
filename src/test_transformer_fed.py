@@ -46,7 +46,7 @@ def runExperiment():
     torch.cuda.manual_seed(seed)
     dataset = fetch_dataset(cfg['data_name'], cfg['subset'])
     process_dataset(dataset)
-    model = eval('models.{}(model_rate=cfg["global_model_rate"], track=True).to(cfg["device"]).to(cfg["device"])'
+    model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                  .format(cfg['model_name']))
     last_epoch, data_split, label_split, model, _, _, _ = resume(model, cfg['model_tag'], load_tag='best', strict=False)
     current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
@@ -67,7 +67,7 @@ def test(dataset, model, logger, epoch):
         model.train(False)
         batch_dataset = BatchDataset(dataset, cfg['bptt'])
         for i, input in enumerate(batch_dataset):
-            input_size = input['img'].size(0)
+            input_size = input['label'].size(0)
             input = to_device(input, cfg['device'])
             output = model(input)
             output['loss'] = output['loss'].mean() if cfg['world_size'] > 1 else output['loss']

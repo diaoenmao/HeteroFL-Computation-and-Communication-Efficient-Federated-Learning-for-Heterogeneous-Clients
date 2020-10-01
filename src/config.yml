@@ -49,4 +49,4 @@ device: cuda
 world_size: 1
 resume_mode: 0
 # other
-save_format: png
+save_format: pdf
