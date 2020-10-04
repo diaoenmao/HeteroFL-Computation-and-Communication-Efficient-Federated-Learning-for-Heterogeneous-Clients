@@ -169,7 +169,7 @@ def test(dataset, data_split, label_split, model, logger, epoch):
 
 def make_local(dataset, data_split, label_split, federation):
     num_active_users = int(np.ceil(cfg['frac'] * cfg['num_users']))
-    user_idx = np.random.choice(range(cfg['num_users']), num_active_users, replace=False)
+    user_idx = torch.arange(cfg['num_users'])[torch.randperm(cfg['num_users'])[:num_active_users]].tolist()
     local_parameters = [copy.deepcopy(federation.global_parameters[user_idx[m]]) for m in range(num_active_users)]
     local = [None for _ in range(num_active_users)]
     for m in range(num_active_users):

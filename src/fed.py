@@ -14,7 +14,8 @@ class Federation:
 
     def make_model_rate(self):
         if cfg['model_split_mode'] == 'dynamic':
-            rate_idx = np.random.choice(np.arange(len(self.rate)), cfg['num_users'], p=cfg['proportion'])
+            rate_idx = torch.multinomial(torch.tensor(cfg['proportion']), num_samples=cfg['num_users'],
+                                         replacement=True).tolist()
             self.model_rate = np.array(self.rate)[rate_idx]
         elif cfg['model_split_mode'] == 'fix':
             self.model_rate = np.array(self.rate)

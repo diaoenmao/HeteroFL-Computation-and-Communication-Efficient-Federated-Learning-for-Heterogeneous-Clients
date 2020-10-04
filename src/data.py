@@ -70,7 +70,7 @@ def iid(dataset, num_users):
     label_split = {}
     for i in range(num_users):
         num_items_i = min(len(idx), num_items)
-        data_split[i] = np.random.choice(idx, num_items_i, replace=False).tolist()
+        data_split[i] = torch.tensor(idx)[torch.randperm(len(idx))[:num_items_i]].tolist()
         label_split[i] = torch.unique(label[data_split[i]]).tolist()
         idx = list(set(idx) - set(data_split[i]))
     return data_split, label_split
@@ -99,13 +99,13 @@ def non_iid(dataset, num_users, label_split=None):
         label_idx_split[label_i] = new_label_idx
     if label_split is None:
         label_split = list(range(cfg['classes_size'])) * shard_per_class
-        np.random.shuffle(label_split)
+        label_split = torch.tensor(label_split)[torch.randperm(len(label_split))].tolist()
         label_split = np.array(label_split).reshape((num_users, -1)).tolist()
         for i in range(len(label_split)):
             label_split[i] = np.unique(label_split[i]).tolist()
     for i in range(num_users):
         for label_i in label_split[i]:
-            idx = np.random.choice(len(label_idx_split[label_i]), replace=False)
+            idx = torch.arange(len(label_idx_split[label_i]))[torch.randperm(len(label_idx_split[label_i]))[0]].item()
             data_split[i].extend(label_idx_split[label_i].pop(idx))
     return data_split, label_split
 
