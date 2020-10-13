@@ -139,12 +139,12 @@ class BatchDataset(Dataset):
         self.dataset = dataset
         self.seq_length = seq_length
         self.S = dataset[0]['label'].size(0)
-        self.idx = list(range(0, self.S - 1, seq_length))
+        self.idx = list(range(0, self.S, seq_length))
 
     def __len__(self):
         return len(self.idx)
 
     def __getitem__(self, index):
-        seq_length = min(self.seq_length, self.S - 1 - index)
+        seq_length = min(self.seq_length, self.S - index)
         input = {'label': self.dataset[:]['label'][:, self.idx[index]:self.idx[index] + seq_length]}
         return input
