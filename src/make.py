@@ -7,6 +7,7 @@ parser.add_argument('--model', default=None, type=str)
 parser.add_argument('--fed', default=1, type=int)
 parser.add_argument('--num_gpu', default=4, type=int)
 parser.add_argument('--world_size', default=1, type=int)
+parser.add_argument('--init_seed', default=0, type=int)
 parser.add_argument('--round', default=4, type=int)
 parser.add_argument('--experiment_step', default=1, type=int)
 parser.add_argument('--num_experiments', default=1, type=int)
@@ -23,6 +24,7 @@ def main():
     world_size = args['world_size']
     round = args['round']
     experiment_step = args['experiment_step']
+    init_seed = args['init_seed']
     num_experiments = args['num_experiments']
     resume_mode = args['resume_mode']
     data_split_mode = args['data_split_mode'] if fed != 0 else 'none'
@@ -48,7 +50,7 @@ def main():
     else:
         raise ValueError('Not valid fed')
     model_names = [[model]]
-    init_seeds = [list(range(0, num_experiments, experiment_step))]
+    init_seeds = [list(range(init_seed, init_seed + num_experiments, experiment_step))]
     world_size = [[world_size]]
     num_experiments = [[experiment_step]]
     resume_mode = [[resume_mode]]
