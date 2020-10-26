@@ -96,6 +96,7 @@ def recur(fn, input, *args):
         raise ValueError('Not valid input type')
     return output
 
+
 def process_dataset(dataset):
     if cfg['data_name'] in ['MNIST', 'CIFAR10']:
         cfg['classes_size'] = dataset['train'].classes_size
