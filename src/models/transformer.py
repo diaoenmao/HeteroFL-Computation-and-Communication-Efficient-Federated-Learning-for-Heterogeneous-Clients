@@ -79,8 +79,6 @@ class MultiheadAttention(nn.Module):
     def forward(self, q, k, v, mask=None):
         q, k, v = self.scaler(self.linear_q(q)), self.scaler(self.linear_k(k)), self.scaler(self.linear_v(v))
         q, k, v = self._reshape_to_batches(q), self._reshape_to_batches(k), self._reshape_to_batches(v)
-        if mask is not None:
-            mask = mask.repeat(self.num_heads, 1, 1)
         q, attn = self.attention(q, k, v, mask)
         q = self._reshape_from_batches(q)
         q = self.scaler(self.linear_o(q))
