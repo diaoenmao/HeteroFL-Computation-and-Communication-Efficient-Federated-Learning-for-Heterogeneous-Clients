@@ -113,7 +113,7 @@ def train(dataset, data_split, label_split, federation, global_model, optimizer,
             exp_finished_time = epoch_finished_time + datetime.timedelta(
                 seconds=round((cfg['num_epochs']['global'] - epoch) * local_time * num_active_users))
             info = {'info': ['Model: {}'.format(cfg['model_tag']),
-                             'Train Epoch: {}({:.0f}%)'.format(epoch, 100. * i / num_active_users),
+                             'Train Epoch: {}({:.0f}%)'.format(epoch, 100. * m / num_active_users),
                              'ID: {}({}/{})'.format(user_idx[m], m + 1, num_active_users),
                              'Learning rate: {}'.format(lr),
                              'Rate: {}'.format(federation.model_rate[user_idx[m]]),
