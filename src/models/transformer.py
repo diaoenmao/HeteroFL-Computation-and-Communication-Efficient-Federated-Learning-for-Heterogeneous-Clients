@@ -153,7 +153,7 @@ class Transformer(nn.Module):
         src = self.transformer_encoder(src)
         out = self.decoder(src)
         out = out.permute(0, 2, 1)
-        if 'label_split' in input:
+        if 'label_split' in input and cfg['mask']:
             label_mask = torch.zeros((cfg['num_tokens'], 1), device=out.device)
             label_mask[input['label_split']] = 1
             out = out.masked_fill(label_mask == 0, 0)

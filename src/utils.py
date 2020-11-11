@@ -118,6 +118,9 @@ def process_control():
     cfg['data_split_mode'] = cfg['control']['data_split_mode']
     cfg['model_split_mode'] = cfg['control']['model_split_mode']
     cfg['model_mode'] = cfg['control']['model_mode']
+    cfg['norm'] = cfg['control']['norm']
+    cfg['scale'] = bool(int(cfg['control']['scale']))
+    cfg['mask'] = bool(int(cfg['control']['mask']))
     cfg['global_model_mode'] = cfg['model_mode'][0]
     cfg['global_model_rate'] = cfg['model_split_rate'][cfg['global_model_mode']]
     model_mode = cfg['model_mode'].split('-')
