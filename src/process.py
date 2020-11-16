@@ -34,6 +34,7 @@ metric_name_dict = {'MNIST': 'Accuracy', 'CIFAR10': 'Accuracy', 'WikiText2': 'Pe
 loc_dict = {'MNIST': 'lower right', 'CIFAR10': 'lower right', 'WikiText2': 'upper right'}
 fontsize = 16
 
+
 def make_control_list(data_name):
     data_name_dict = {'MNIST': 'conv', 'CIFAR10': 'resnet18', 'WikiText2': 'transformer'}
     data_split_mode_dict = {'MNIST': ['iid', 'non-iid-2'], 'CIFAR10': ['iid', 'non-iid-2'], 'WikiText2': ['iid']}
@@ -47,19 +48,50 @@ def make_control_list(data_name):
                                ['dynamic'], combination]
     fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
                           ['fix'], interp]
-    # local_combination_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'],
-    #                              data_split_mode, ['fix'], combination]
-    # local_interp_control = [exp, [data_name], ['label'], [model_name], ['2'], ['100'], ['0.1'], data_split_mode,
-    #                         ['fix'], interp]
     controls_list = [no_fed_control, fed_single_control, fed_combination_control, fed_interp_control]
     return controls_list
 
 
+def make_ablation_control_list(data_name):
+    global interp_name
+    interp_name = ['a-e', 'e']
+    data_name_dict = {'MNIST': 'conv', 'CIFAR10': 'resnet18', 'WikiText2': 'transformer'}
+    data_split_mode_dict = {'MNIST': ['iid', 'non-iid-2'], 'CIFAR10': ['iid', 'non-iid-2']}
+    model_name = data_name_dict[data_name]
+    data_split_mode = data_split_mode_dict[data_name]
+    combination = ['a1-e1']
+    norm_1 = ['bn', 'none']
+    norm_2 = ['in', 'ln', 'gn']
+    controls_list = []
+    for d in data_split_mode:
+        if d == 'iid':
+            control_name_1 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['fix'],
+                              ['a1', 'e1'], norm_2 + norm_1, ['1'], ['1']]
+            control_name_2 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['dynamic'],
+                              combination, norm_2, ['1'], ['1']]
+            control_name_3 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['dynamic'],
+                              combination, norm_1, ['0', '1'], ['1']]
+            control_name = [control_name_1, control_name_2, control_name_3]
+        elif d == 'non-iid-2':
+            control_name_1 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['fix'],
+                              ['a1', 'e1'], norm_2, ['1'], ['1']]
+            control_name_2 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['fix'],
+                              ['a1', 'e1'], norm_1, ['1'], ['0', '1']]
+            control_name_3 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['dynamic'],
+                              combination, norm_2, ['1'], ['1']]
+            control_name_4 = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], [d], ['dynamic'],
+                              combination, norm_1, ['0', '1'], ['0', '1']]
+            control_name = [control_name_1, control_name_2, control_name_3, control_name_4]
+        controls_list = controls_list + control_name
+    return controls_list
+
+
 def main():
-    mnist_control_list = make_control_list('MNIST')
-    cifar10_control_list = make_control_list('CIFAR10')
-    wikitext2_control_list = make_control_list('WikiText2')
-    controls_list = mnist_control_list + cifar10_control_list + wikitext2_control_list
+    mnist_control_list = make_ablation_control_list('MNIST')
+    cifar10_control_list = make_ablation_control_list('CIFAR10')
+    # wikitext2_control_list = make_control_list('WikiText2')
+    # controls_list = mnist_control_list + cifar10_control_list + wikitext2_control_list
+    controls_list = mnist_control_list + cifar10_control_list
     controls = []
     for i in range(len(controls_list)):
         controls.extend(list(itertools.product(*controls_list[i])))
@@ -71,10 +103,10 @@ def main():
     extracted_processed_result = {}
     extract_processed_result(extracted_processed_result, processed_result_exp, [])
     df = make_df(extracted_processed_result)
-    make_vis(df)
+    # make_vis(df)
     extracted_processed_result = {}
     extract_processed_result(extracted_processed_result, processed_result_history, [])
-    make_learning_curve(extracted_processed_result)
+    # make_learning_curve(extracted_processed_result)
     return
 
 
@@ -164,25 +196,27 @@ def make_df(extracted_processed_result):
     df = defaultdict(list)
     for exp_name in extracted_processed_result:
         control = exp_name.split('_')
-        data_split_mode, mode_split_mode, control_name = control[-3:]
+        # data_split_mode, mode_split_mode, control_name = control[-3:]
+        data_split_mode, model_split_mode, control_name = control[-6:-3]
+        except_control_name = control[:-4] + control[-3:]
         index_name = [control_name]
         if data_split_mode == 'none':
-            df_name = '_'.join(control[:-1])
+            df_name = '_'.join(except_control_name)
             df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
         else:
-            if mode_split_mode == 'fix' or control_name == 'e1':
+            if model_split_mode == 'fix' or control_name == 'e1':
                 if '-' in control_name:
                     label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-                    df_name = '{}_{}'.format('_'.join(control[:-1]), label_name)
+                    df_name = '{}_{}'.format('_'.join(except_control_name), label_name)
                     df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
                 else:
                     for label_name in interp_name:
                         if control_name[0] == label_name[0]:
-                            df_name = '{}_{}'.format('_'.join(control[:-1]), label_name)
+                            df_name = '{}_{}'.format('_'.join(except_control_name), control_name)
                             df[df_name].append(
                                 pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
             else:
-                df_name = '_'.join(control[:-1])
+                df_name = '_'.join(except_control_name)
                 df[df_name].append(pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
     startrow = 0
     writer = pd.ExcelWriter('{}/result.xlsx'.format(result_path), engine='xlsxwriter')
@@ -225,7 +259,7 @@ def make_vis(df):
                 plt.ylabel(metric_name, fontsize=fontsize)
                 plt.xticks(fontsize=fontsize)
                 plt.yticks(fontsize=fontsize)
-                plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
+                plt.ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
             elif 'iid' in df_name:
                 fig_name = '{}_{}'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
@@ -312,7 +346,8 @@ def make_stats(model_tag):
     model_tag_list = model_tag.split('_')
     data_name = model_tag_list[1]
     model_name = model_tag_list[3]
-    model_mode = model_tag_list[-1]
+    # model_mode = model_tag_list[-1]
+    model_mode = model_tag_list[-4]
     model_mode_list = model_mode.split('-')
     global_model_mode = model_mode_list[0][0]
     stats_result_path = os.path.join(result_path, '{}_{}_{}.pt'.format(data_name, model_name, global_model_mode))
