@@ -41,13 +41,13 @@ def make_control_list(data_name):
     model_name = data_name_dict[data_name]
     data_split_mode = data_split_mode_dict[data_name]
     no_fed_control = [exp, [data_name], ['label'], [model_name], ['0'], ['1'], ['1'], ['none'], ['fix'],
-                      combination_mode]
+                      combination_mode, ['bn'], ['1'], ['1']]
     fed_single_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
-                          ['fix'], combination_mode]
+                          ['fix'], combination_mode, ['bn'], ['1'], ['1']]
     fed_combination_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
-                               ['dynamic'], combination]
+                               ['dynamic'], combination, ['bn'], ['1'], ['1']]
     fed_interp_control = [exp, [data_name], ['label'], [model_name], ['1'], ['100'], ['0.1'], data_split_mode,
-                          ['fix'], interp]
+                          ['fix'], interp, ['bn'], ['1'], ['1']]
     controls_list = [no_fed_control, fed_single_control, fed_combination_control, fed_interp_control]
     return controls_list
 
@@ -87,11 +87,13 @@ def make_ablation_control_list(data_name):
 
 
 def main():
-    mnist_control_list = make_ablation_control_list('MNIST')
-    cifar10_control_list = make_ablation_control_list('CIFAR10')
-    # wikitext2_control_list = make_control_list('WikiText2')
-    # controls_list = mnist_control_list + cifar10_control_list + wikitext2_control_list
-    controls_list = mnist_control_list + cifar10_control_list
+    # mnist_control_list = make_ablation_control_list('MNIST')
+    # cifar10_control_list = make_ablation_control_list('CIFAR10')
+    # controls_list = mnist_control_list + cifar10_control_list
+    mnist_control_list = make_control_list('MNIST')
+    cifar10_control_list = make_control_list('CIFAR10')
+    wikitext2_control_list = make_control_list('WikiText2')
+    controls_list = mnist_control_list + cifar10_control_list + wikitext2_control_list
     controls = []
     for i in range(len(controls_list)):
         controls.extend(list(itertools.product(*controls_list[i])))
@@ -103,10 +105,10 @@ def main():
     extracted_processed_result = {}
     extract_processed_result(extracted_processed_result, processed_result_exp, [])
     df = make_df(extracted_processed_result)
-    # make_vis(df)
+    make_vis(df)
     extracted_processed_result = {}
     extract_processed_result(extracted_processed_result, processed_result_history, [])
-    # make_learning_curve(extracted_processed_result)
+    make_learning_curve(extracted_processed_result)
     return
 
 

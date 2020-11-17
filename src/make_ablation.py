@@ -70,55 +70,22 @@ def main():
     norm_2 = ['in', 'ln', 'gn']
     if data_split_mode == 'iid':
         control_name_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], norm_2 + norm_1,
-                               ['1'], ['1']]
+                          ['1'], ['1']]
         control_name_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_2,
                           ['1'], ['1']]
         control_name_3 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_1,
-                          ['0','1'], ['1']]
+                          ['0', '1'], ['1']]
         control_name = [control_name_1, control_name_2, control_name_3]
     elif data_split_mode == 'non-iid-2':
         control_name_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], norm_2,
-                               ['1'], ['1']]
+                          ['1'], ['1']]
         control_name_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], norm_1,
-                               ['1'], ['0', '1']]
+                          ['1'], ['0', '1']]
         control_name_3 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_2,
                           ['1'], ['1']]
         control_name_4 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_1,
-                          ['0','1'], ['0','1']]
+                          ['0', '1'], ['0', '1']]
         control_name = [control_name_1, control_name_2, control_name_3, control_name_4]
-
-    # if data_split_mode == 'iid':
-    #     control_name_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['none'],
-    #                       ['0'], ['1']]
-    #     control_name = [control_name_1]
-    # elif data_split_mode == 'non-iid-2':
-    #     control_name_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], ['none'],
-    #                       ['1'], ['0']]
-    #     control_name_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['bn'],
-    #                       ['0'], ['0']]
-    #     control_name_3 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['none'],
-    #                       ['0'], ['0', '1']]
-    #     control_name_4 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['none'],
-    #                       ['1'], ['0']]
-    #     control_name = [control_name_1, control_name_2, control_name_3, control_name_4]
-
-    # control_name_norm_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], norm_1, ['0', '1'],
-    # ['0', '1']]
-    # control_name_norm_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], norm_2, ['1'], ['1']]
-    # control_name_fed_norm_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_1, ['0',
-    # '1'], ['0', '1']]
-    # control_name_fed_norm_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, norm_2, ['1'],
-    # ['1']]
-    # control_name = [control_name_norm_1, control_name_norm_2, control_name_fed_norm_1, control_name_fed_norm_2]
-    # control_name = [control_name_norm_1, control_name_fed_norm_1]
-
-    # control_name_1 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], ['bn'], ['0'], ['0']]
-    # control_name_2 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['bn'], ['0'], ['0']]
-    # control_name_3 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], ['none'], ['0'], ['0', '1']]
-    # control_name_4 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['none'], ['0'], ['0', '1']]
-    # control_name_5 = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'e1'], ['none'], ['1'], ['0']]
-    # control_name_6 = [['1'], ['100'], ['0.1'], [data_split_mode], ['dynamic'], combination, ['none'], ['1'], ['0']]
-    # control_name = [control_name_1, control_name_2, control_name_3, control_name_4, control_name_5, control_name_6]
 
     control_names = []
     for i in range(len(control_name)):
