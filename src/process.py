@@ -26,10 +26,9 @@ for i in range(1, 10):
         for k in range(j + 1, len(model_split_mode)):
             interp += ['{}{}-'.format(model_split_mode[j], i) + '{}{}'.format(model_split_mode[k], 10 - i)]
 model_split_rate = {'a': 1, 'b': 0.5, 'c': 0.25, 'd': 0.125, 'e': 0.0625}
-model_split_rate_key = list(model_split_rate.keys())
-colors = cm.rainbow(np.linspace(1, 0, len(model_split_rate_key)))
-model_color = {model_split_rate_key[i]: colors[i] for i in range(len(model_split_rate_key))}
 interp_name = ['a-b', 'a-c', 'a-d', 'a-e', 'b-c', 'b-d', 'b-e', 'c-d', 'c-e', 'd-e', 'e']
+marker_dict = {'a-b': 'o', 'a-c': 's', 'a-d': 'p', 'a-e': 'P', 'b-c': '*', 'b-d': 'h', 'b-e': 'X', 'c-d': 'D',
+               'c-e': '^', 'd-e': 'v', 'e': '>'}
 metric_name_dict = {'MNIST': 'Accuracy', 'CIFAR10': 'Accuracy', 'WikiText2': 'Perplexity'}
 loc_dict = {'MNIST': 'lower right', 'CIFAR10': 'lower right', 'WikiText2': 'upper right'}
 fontsize = 16
@@ -198,7 +197,6 @@ def make_df(extracted_processed_result):
     df = defaultdict(list)
     for exp_name in extracted_processed_result:
         control = exp_name.split('_')
-        # data_split_mode, mode_split_mode, control_name = control[-3:]
         data_split_mode, model_split_mode, control_name = control[-6:-3]
         except_control_name = control[:-4] + control[-3:]
         index_name = [control_name]
@@ -214,7 +212,7 @@ def make_df(extracted_processed_result):
                 else:
                     for label_name in interp_name:
                         if control_name[0] == label_name[0]:
-                            df_name = '{}_{}'.format('_'.join(except_control_name), control_name)
+                            df_name = '{}_{}'.format('_'.join(except_control_name), label_name)
                             df[df_name].append(
                                 pd.DataFrame(data=extracted_processed_result[exp_name], index=index_name))
             else:
@@ -245,7 +243,7 @@ def make_vis(df):
                 fig_name = '{}_{}_local'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
                 y = df[df_name]['Local-{}_mean'.format(metric_name)]
-                plt.plot(x, y, '^--', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Number of Model Parameters', fontsize=fontsize)
                 plt.ylabel(metric_name, fontsize=fontsize)
@@ -255,7 +253,7 @@ def make_vis(df):
                 fig_name = '{}_{}_global'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
                 y = df[df_name]['Global-{}_mean'.format(metric_name)]
-                plt.plot(x, y, '^--', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Number of Model Parameters', fontsize=fontsize)
                 plt.ylabel(metric_name, fontsize=fontsize)
@@ -266,7 +264,7 @@ def make_vis(df):
                 fig_name = '{}_{}'.format('_'.join(control[:-1]), label_name[0])
                 fig[fig_name] = plt.figure(fig_name)
                 y = df[df_name]['Global-{}_mean'.format(metric_name)]
-                plt.plot(x, y, '^--', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Number of Model Parameters', fontsize=fontsize)
                 plt.ylabel(metric_name, fontsize=fontsize)
@@ -302,7 +300,7 @@ def make_learning_curve(processed_result):
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
                 fig_name = '{}_lc_local'.format('_'.join(control[:-1]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, '-', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
@@ -314,7 +312,7 @@ def make_learning_curve(processed_result):
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
                 fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, '-', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
@@ -327,7 +325,7 @@ def make_learning_curve(processed_result):
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
                 fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, '-', label=label_name)
+                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
@@ -348,7 +346,6 @@ def make_stats(model_tag):
     model_tag_list = model_tag.split('_')
     data_name = model_tag_list[1]
     model_name = model_tag_list[3]
-    # model_mode = model_tag_list[-1]
     model_mode = model_tag_list[-4]
     model_mode_list = model_mode.split('-')
     global_model_mode = model_mode_list[0][0]
