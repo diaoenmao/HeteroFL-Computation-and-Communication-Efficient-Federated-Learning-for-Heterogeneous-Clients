@@ -3,7 +3,6 @@ import hashlib
 import os
 import glob
 import gzip
-import requests
 import tarfile
 import zipfile
 import numpy as np
@@ -104,37 +103,6 @@ def download_url(url, root, filename, md5):
                 print('Failed download. Trying https -> http instead.'
                       ' Downloading ' + url + ' to ' + path)
                 urllib.request.urlretrieve(url, path, reporthook=make_bar_updater(tqdm(unit='B', unit_scale=True)))
-        if not check_integrity(path, md5):
-            raise RuntimeError('Not valid downloaded file')
-    return
-
-
-def download_google(id, root, filename, md5):
-    google_url = "https://docs.google.com/uc?export=download"
-    path = os.path.join(root, filename)
-    makedir_exist_ok(root)
-    if os.path.isfile(path) and check_integrity(path, md5):
-        print('Using downloaded and verified file: ' + path)
-    else:
-        session = requests.Session()
-        response = session.get(google_url, params={'id': id}, stream=True)
-        token = None
-        for key, value in response.cookies.items():
-            if key.startswith('download_warning'):
-                token = value
-                break
-        if token:
-            params = {'id': id, 'confirm': token}
-            response = session.get(google_url, params=params, stream=True)
-        with open(path, "wb") as f:
-            pbar = tqdm(total=None)
-            progress = 0
-            for chunk in response.iter_content(32768):
-                if chunk:
-                    f.write(chunk)
-                    progress += len(chunk)
-                    pbar.update(progress - pbar.n)
-            pbar.close()
         if not check_integrity(path, md5):
             raise RuntimeError('Not valid downloaded file')
     return

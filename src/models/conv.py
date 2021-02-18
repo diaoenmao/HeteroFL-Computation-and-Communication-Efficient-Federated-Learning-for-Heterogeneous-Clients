@@ -76,7 +76,7 @@ def conv(model_rate=1, track=False):
     data_shape = cfg['data_shape']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['conv']['hidden_size']]
     classes_size = cfg['classes_size']
-    scaler_rate = model_rate / cfg['global_model_rate'] if cfg['fed'] != 2 else 1
+    scaler_rate = model_rate / cfg['global_model_rate']
     model = Conv(data_shape, hidden_size, classes_size, scaler_rate, track)
     model.apply(init_param)
     return model

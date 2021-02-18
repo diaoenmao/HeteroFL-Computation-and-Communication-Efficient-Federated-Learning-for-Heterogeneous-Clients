@@ -45,8 +45,6 @@ def main():
         script_name = [['{}_{}.py'.format(run, file)]]
     elif fed == 1:
         script_name = [['{}_{}_fed.py'.format(run, file)]]
-    elif fed == 2:
-        script_name = [['{}_{}_local.py'.format(run, file)]]
     else:
         raise ValueError('Not valid fed')
     model_names = [[model]]
@@ -76,11 +74,6 @@ def main():
                                     ['1']]
         control_name_interp = [['1'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp, ['bn'], ['1'], ['1']]
         control_name = [control_name_single, control_name_combination, control_name_interp]
-    elif fed == 2:
-        control_name_single = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], ['a1', 'b1', 'c1', 'd1', 'e1'],
-                               ['bn'], ['1'], ['1']]
-        control_name_interp = [['2'], ['100'], ['0.1'], [data_split_mode], ['fix'], interp, ['bn'], ['1'], ['1']]
-        control_name = [control_name_single, control_name_interp]
     else:
         raise ValueError('Not valid fed')
     control_names = []
