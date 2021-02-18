@@ -292,15 +292,15 @@ def make_learning_curve(processed_result):
         control = exp_name.split('_')
         data_name = control[0]
         metric_name = metric_name_dict[data_name]
-        control_name = control[-1]
+        control_name = control[-4]
         if control_name in ['a5-b5', 'a5-c5', 'a5-d5', 'a5-e5', 'a1-b1', 'a1-c1', 'a1-d1', 'a1-e1']:
             if 'non-iid-2' in exp_name:
                 y = processed_result[exp_name]['Local-{}_mean'.format(metric_name)]
                 x = np.arange(len(y))
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-                fig_name = '{}_lc_local'.format('_'.join(control[:-1]))
+                fig_name = '{}_lc_local'.format('_'.join(control[:-4] + control[-3:]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
+                plt.plot(x, y, linestyle='-', label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
@@ -310,9 +310,9 @@ def make_learning_curve(processed_result):
                 y = processed_result[exp_name]['Global-{}_mean'.format(metric_name)]
                 x = np.arange(len(y))
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-                fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
+                fig_name = '{}_lc_global'.format('_'.join(control[:-4] + control[-3:]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
+                plt.plot(x, y, linestyle='-', label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
@@ -323,9 +323,9 @@ def make_learning_curve(processed_result):
                 y = processed_result[exp_name]['Global-{}_mean'.format(metric_name)]
                 x = np.arange(len(y))
                 label_name = '-'.join(['{}'.format(x[0]) for x in list(control_name.split('-'))])
-                fig_name = '{}_lc_global'.format('_'.join(control[:-1]))
+                fig_name = '{}_lc_global'.format('_'.join(control[:-4] + control[-3:]))
                 fig[fig_name] = plt.figure(fig_name)
-                plt.plot(x, y, linestyle='-', marker=marker_dict[label_name], label=label_name)
+                plt.plot(x, y, linestyle='-', label=label_name)
                 plt.legend(loc=loc_dict[data_name], fontsize=fontsize)
                 plt.xlabel('Communication rounds', fontsize=fontsize)
                 plt.ylabel('Test {}'.format(metric_name), fontsize=fontsize)
