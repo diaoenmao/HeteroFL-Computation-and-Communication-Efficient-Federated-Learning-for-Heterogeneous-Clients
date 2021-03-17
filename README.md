@@ -20,7 +20,7 @@ This is an implementation of [HeteroFL: Computation and Communication Efficient 
     ```
  - Train CIFAR10 dataset (Non-IID 2 classes) with ResNet model, 10 users, active rate 0.1, model split 'Dynamic', model split mode 'a-b-c (uniform)', GroupNorm, Scaler (False) , Masked CrossEntropy (False)
     ```ruby
-    python train_classisifer_fed.py --data_name CIFAR10 --model_name resnet18 --control_name 1_10_0.1_non-iid-2_dynamic_a-b-c_gn_0_0
+    python train_classisifer_fed.py --data_name CIFAR10 --model_name resnet18 --control_name 1_10_0.1_non-iid-2_dynamic_a1-b1-c1_gn_0_0
     ```
  - Test WikiText2 dataset with Transformer model, 100 users, active rate 0.01, model split 'Fix', model split mode 'a (50%), b(50%)', No Normalization, Scaler (True) , Masked CrossEntropy (False)
     ```ruby
