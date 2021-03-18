@@ -163,7 +163,7 @@ def resnet18(model_rate=1, track=False):
     classes_size = cfg['classes_size']
     hidden_size = [int(np.ceil(model_rate * x)) for x in cfg['resnet']['hidden_size']]
     scaler_rate = model_rate / cfg['global_model_rate']
-    model = ResNet(data_shape, hidden_size, Block, [1, 1, 1, 2], classes_size, scaler_rate, track)
+    model = ResNet(data_shape, hidden_size, Block, [2, 2, 2, 2], classes_size, scaler_rate, track)
     model.apply(init_param)
     return model
 
