@@ -1,4 +1,4 @@
-Pillow == 8.0.1
+Pillow == 8.1.1
 anytree == 2.8.0
 matplotlib == 3.3.2
 numpy == 1.19.2
