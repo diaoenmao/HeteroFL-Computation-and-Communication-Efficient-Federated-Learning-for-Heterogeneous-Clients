@@ -60,14 +60,12 @@ def runExperiment():
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
         _, data_split, label_split, model, _, _, _ = resume(model, cfg['model_tag'])
-        current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
-        logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
+        logger_path = os.path.join('output', 'runs', '{}'.format(cfg['model_tag']))
         logger = Logger(logger_path)
     else:
         last_epoch = 1
         data_split, label_split = split_dataset(dataset, cfg['num_users'], cfg['data_split_mode'])
-        current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
-        logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
+        logger_path = os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag']))
         logger = Logger(logger_path)
     if data_split is None:
         data_split, label_split = split_dataset(dataset, cfg['num_users'], cfg['data_split_mode'])

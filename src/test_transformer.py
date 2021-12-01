@@ -47,8 +47,7 @@ def runExperiment():
     model = eval('models.{}(model_rate=cfg["global_model_rate"]).to(cfg["device"]).to(cfg["device"])'
                  .format(cfg['model_name']))
     last_epoch, model, _, _, _ = resume(model, cfg['model_tag'], load_tag='best', strict=False)
-    current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
-    logger_path = 'output/runs/test_{}_{}'.format(cfg['model_tag'], current_time)
+    logger_path = 'output/runs/test_{}'.format(cfg['model_tag'])
     test_logger = Logger(logger_path)
     test_logger.safe(True)
     test(dataset['test'], model, test_logger, last_epoch)

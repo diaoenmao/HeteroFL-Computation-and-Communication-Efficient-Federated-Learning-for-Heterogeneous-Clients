@@ -56,13 +56,11 @@ def runExperiment():
     elif cfg['resume_mode'] == 2:
         last_epoch = 1
         _, model, _, _, _ = resume(model, cfg['model_tag'])
-        current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
-        logger_path = 'output/runs/{}_{}'.format(cfg['model_tag'], current_time)
+        logger_path = os.path.join('output', 'runs', '{}'.format(cfg['model_tag']))
         logger = Logger(logger_path)
     else:
         last_epoch = 1
-        current_time = datetime.datetime.now().strftime('%b%d_%H-%M-%S')
-        logger_path = 'output/runs/train_{}_{}'.format(cfg['model_tag'], current_time)
+        logger_path = os.path.join('output', 'runs', 'train_{}'.format(cfg['model_tag']))
         logger = Logger(logger_path)
     if cfg['world_size'] > 1:
         model = torch.nn.DataParallel(model, device_ids=list(range(cfg['world_size'])))
