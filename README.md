@@ -1,5 +1,5 @@
 # HeteroFL: Computation and Communication Efficient Federated Learning for Heterogeneous Clients
-This is an implementation of [HeteroFL: Computation and Communication Efficient Federated Learning for Heterogeneous Clients](https://arxiv.org/abs/2010.01264)
+[ICLR 2021] This is an implementation of [HeteroFL: Computation and Communication Efficient Federated Learning for Heterogeneous Clients](https://arxiv.org/abs/2010.01264)
 - Global model parametersWgare distributed to `m=6` local clients with `p=3` computation complexity levels.
 <img src="/asset/HeteroFL.png">
 
