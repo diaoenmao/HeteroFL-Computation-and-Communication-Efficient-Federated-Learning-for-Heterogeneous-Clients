@@ -7,6 +7,14 @@ import torch.optim as optim
 from itertools import repeat
 from torchvision.utils import save_image
 from config import cfg
+from quantization import (
+    calc_compression_stats,
+    dequantize_sliced_parameters,
+    dequantize_tensor,
+    quantize_sliced_parameters,
+    quantize_tensor,
+    simulate_quantize_parameters,
+)
 
 
 def check_exists(path):
